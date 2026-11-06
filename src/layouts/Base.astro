@@ -77,12 +77,14 @@ const person = {
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         var mode = params.get('build');
         if (mode === '0') return;
+        // Los buscadores indexan la página, no una pregunta.
+        if (!mode && /bot|crawl|spider|slurp/i.test(navigator.userAgent)) return;
         var seen = false;
         try {
           seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < 6048e5;
         } catch (e) {}
         var asked = mode === '1' || mode === 'full' || mode === 'present';
-        if (seen && !asked) return;
+        if (seen && !asked && mode !== 'ask') return;
         if (mode === 'full' || mode === 'present') {
           root.dataset.pilot = mode;
           history.scrollRestoration = 'manual';

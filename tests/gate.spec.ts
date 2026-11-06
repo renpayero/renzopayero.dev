@@ -198,6 +198,26 @@ test.describe('cuándo no aparece', () => {
     }
   });
 
+  test('un buscador indexa la página, no la pregunta', async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' });
+    const page = await context.newPage();
+    await page.goto(`${baseURL}/`);
+    expect(await gateState(page)).toBeNull();
+    expect(await page.evaluate(() => document.documentElement.dataset.build ?? null)).toBeNull();
+    await expect(page.locator('.lede')).toBeVisible();
+    await context.close();
+  });
+
+  test('?build=ask la abre aunque ya se haya respondido', async ({ page }) => {
+    await page.goto('/?build=0');
+    await page.evaluate(() => localStorage.setItem('rp-built', String(Date.now())));
+    await page.goto('/');
+    expect(await gateState(page)).toBeNull();
+    await page.goto('/?build=ask');
+    expect(await gateState(page)).toBe('es');
+    await expect(dialog(page)).toBeVisible();
+  });
+
   test('en las páginas de proyecto no está', async ({ page }) => {
     await page.goto('/proyectos/legacy/');
     await expect(page.locator('[data-gate-root]')).toHaveCount(0);

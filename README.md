@@ -16,12 +16,13 @@ Parámetros útiles en la URL, todos saltean la terminal de inicio:
 
 | Parámetro | Qué hace |
 |---|---|
+| `?build=ask` | Abre la terminal aunque ya la hayas respondido |
 | `?build=present` | Modo presentación: construye y baja sola, con tiempo para leer y sin quedarse quieta nunca |
 | `?build=full` | El build completo con ritmo de reel. Es lo que lanza el botón "Ver el build completo" |
 | `?build=1` | Construye al llegar con el scroll |
 | `?build=0` | La página final, sin construcción |
 
-La terminal aparece en la primera visita a la portada (y otra vez después de 7 días). Para volver a verla, borrá `rp-built` del `localStorage`.
+La terminal aparece en la primera visita a la portada, y otra vez después de 7 días. Para volver a verla, usá `?build=ask`. Los buscadores no la ven: indexan la página final.
 
 ## Cómo está armado
 
