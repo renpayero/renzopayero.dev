@@ -14,7 +14,8 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-git archive --format=tar HEAD | ssh "$HOST" "
+# Sin conversión de fin de línea: en Windows, git archive entregaría CRLF.
+git -c core.autocrlf=false archive --format=tar HEAD | ssh "$HOST" "
   set -eu
   rm -rf $DIR.new
   mkdir -p $DIR.new
