@@ -1,0 +1,123 @@
+---
+import { content } from '../../i18n/content';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const c = content[Astro.props.lang].capabilities;
+const tiles = [
+  { key: 'odoo', ...c.tiles.odoo },
+  { key: 'ai', ...c.tiles.ai },
+  { key: 'web', ...c.tiles.web },
+  { key: 'infra', ...c.tiles.infra },
+  { key: 'lead', ...c.tiles.lead },
+];
+---
+<section class="section capabilities" data-section="capacidades">
+  <div class="wrap">
+    <h2 class="h2" data-type data-frame>{c.title}</h2>
+    <ul class="bento">
+      {
+        tiles.map((tile) => (
+          <li class={`bento__tile bento__tile--${tile.key} reveal`} data-frame>
+            <h3 class="bento__title">{tile.title}</h3>
+            <p class="bento__text">{tile.text}</p>
+            <ul class="bento__items">
+              {tile.items.map((item) => <li>{item}</li>)}
+            </ul>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style is:global>
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: clamp(32px, 5vw, 64px);
+    list-style: none;
+  }
+
+  .bento__tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: clamp(240px, 26vw, 340px);
+    padding: clamp(24px, 3vw, 36px);
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+  }
+
+  .bento__tile--odoo {
+    grid-column: span 7;
+    background: var(--color-odoo);
+  }
+
+  .bento__tile--ai {
+    grid-column: span 5;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgb(113 75 103 / 0.85), transparent 62%),
+      var(--color-surface);
+  }
+
+  .bento__tile--web,
+  .bento__tile--infra,
+  .bento__tile--lead {
+    grid-column: span 4;
+  }
+
+  .bento__title {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+  }
+
+  .bento__tile--odoo .bento__title {
+    font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .bento__text {
+    max-width: 36ch;
+    color: rgb(245 242 244 / 0.72);
+    line-height: 1.38;
+  }
+
+  .bento__tile--odoo .bento__text {
+    color: var(--color-text);
+    font-size: clamp(1.0625rem, 1.5vw, 1.3125rem);
+  }
+
+  .bento__items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 12px;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .bento__items li {
+    padding: 5px 10px;
+    border-radius: 980px;
+    background: rgb(245 242 244 / 0.1);
+  }
+
+  @media (max-width: 767px) {
+    .bento__tile {
+      grid-column: 1 / -1;
+      min-height: 0;
+    }
+  }
+</style>

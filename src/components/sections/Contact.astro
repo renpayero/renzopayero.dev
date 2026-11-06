@@ -1,0 +1,126 @@
+---
+import { content } from '../../i18n/content';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const c = content[Astro.props.lang].contact;
+const EMAIL = 'rpayerodev@gmail.com';
+---
+<section id="contacto" class="section contact" data-section="contacto">
+  <div class="contact__glow" aria-hidden="true"></div>
+  <div class="wrap contact__inner">
+    <h2 class="contact__title" data-live data-frame>
+      <span class="contact__halo" aria-hidden="true">{c.title}</span>
+      <span class="contact__halo contact__halo--near" aria-hidden="true">{c.title}</span>
+      <span class="contact__lit">{c.title}</span>
+    </h2>
+    <p class="body-l contact__text reveal" data-frame>{c.text}</p>
+    <div class="cta contact__cta reveal" data-frame>
+      <a class="btn btn--primary" href={`mailto:${EMAIL}`}>{c.write}</a>
+      <a class="btn" href="/cv/renzo-payero-cv-es.pdf" download>{c.cvEs}</a>
+      <a class="btn" href="/cv/renzo-payero-cv-en.pdf" download>{c.cvEn}</a>
+    </div>
+    <ul class="contact__links reveal">
+      <li><a href={`mailto:${EMAIL}`}>{EMAIL}</a></li>
+      <li><a href="https://www.linkedin.com/in/renzopayero/" rel="noopener" target="_blank">{c.linkedin}</a></li>
+      <li><a href="https://dakodev.com/" rel="noopener" target="_blank">{c.dakodev}</a></li>
+    </ul>
+  </div>
+  <footer class="wrap contact__foot">
+    <p>Renzo Payero. {c.place}.</p>
+    <p>{c.legal}</p>
+  </footer>
+</section>
+
+<style is:global>
+  .contact {
+    overflow: clip;
+    padding-bottom: 96px;
+    text-align: center;
+  }
+
+  .contact__glow {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 90%;
+    background: radial-gradient(50% 50% at 50% 42%, rgb(113 75 103 / 0.45), transparent);
+    pointer-events: none;
+  }
+
+  .contact__inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .contact__title {
+    font-size: clamp(4rem, 13vw, 12rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    font-variation-settings: 'opsz' 32;
+    position: relative;
+  }
+
+  .contact__lit {
+    position: relative;
+    color: var(--color-odoo);
+    -webkit-text-stroke: 0.028em var(--color-text);
+    paint-order: stroke fill;
+  }
+
+  .contact__halo {
+    position: absolute;
+    inset: 0;
+    color: var(--color-odoo);
+    -webkit-text-stroke: 0.14em var(--color-odoo);
+    filter: blur(0.2em);
+  }
+
+  .contact__halo--near {
+    -webkit-text-stroke: 0.07em var(--color-odoo);
+    filter: blur(0.05em);
+  }
+
+  .contact__text {
+    margin-top: clamp(20px, 3vw, 32px);
+  }
+
+  .contact__cta {
+    justify-content: center;
+  }
+
+  .contact__links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    margin-top: 32px;
+    list-style: none;
+    color: var(--color-gris);
+    font-size: 0.9375rem;
+  }
+
+  .contact__links a {
+    transition: color 0.32s var(--ease-apple);
+  }
+
+  .contact__links a:hover {
+    color: var(--color-text);
+  }
+
+  .contact__foot {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 24px;
+    margin-top: clamp(64px, 9vw, 120px);
+    color: var(--color-gris);
+    font-size: 0.75rem;
+  }
+</style>

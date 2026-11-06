@@ -76,7 +76,20 @@ export class Overlay {
   }
 
   start(): void {
+    gsap.ticker.remove(this.render);
     gsap.ticker.add(this.render);
+  }
+
+  /** Sin build activo no se gasta ni un cuadro. */
+  stop(): void {
+    gsap.ticker.remove(this.render);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  clear(): void {
+    this.frames.length = 0;
+    this.guides.length = 0;
+    this.notes.length = 0;
   }
 
   destroy(): void {

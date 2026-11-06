@@ -47,3 +47,71 @@
     border-radius: 4px;
   }
 }
+
+@layer components {
+  .section {
+    position: relative;
+    padding-block: clamp(96px, 11vw, 160px);
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 1260px;
+    margin-inline: auto;
+  }
+
+  .h2 {
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+  }
+
+  .tone {
+    color: var(--color-gris);
+  }
+
+  .body-l {
+    max-width: 60ch;
+    font-size: clamp(1.0625rem, 1.5vw, 1.3125rem);
+    line-height: 1.38;
+    color: var(--color-gris);
+  }
+
+  .body-l strong {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+}
+
+/*
+ * Revelado medido en Apple: la clase entra a 70vh y la transición es por tiempo, no por scroll.
+ * Sin JS o con reduced motion todo está visible.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  [data-js] .reveal:not(.is-in) {
+    opacity: 0;
+    transform: translateY(var(--reveal-y, 24px));
+  }
+
+  [data-js] .reveal {
+    transition:
+      opacity 0.9s var(--ease-entrada),
+      transform 0.9s var(--ease-entrada);
+  }
+
+  /* Texto que un agente va a tipear: oculto solo mientras su sección no se construyó. */
+  :is([data-build='pending'], [data-build='running']) [data-section]:not([data-built]) [data-type] {
+    opacity: 0;
+  }
+}

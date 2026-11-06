@@ -16,7 +16,7 @@ const t = ui[lang].hud;
   <div class="hud__pill">
     <span class="hud__dots" data-hud-dots aria-hidden="true"></span>
     <span class="hud__text" data-hud-text></span>
-    <span class="hud__track" aria-hidden="true"><span class="hud__fill" data-hud-fill></span></span>
+    <span class="hud__segs" data-hud-segs aria-hidden="true"></span>
   </div>
   <button type="button" class="hud__circle" data-hud-toggle aria-label={t.pause} data-pause={t.pause} data-play={t.play}>
     <span class="hud__icon" data-icon-pause set:html={pause} />
@@ -111,21 +111,54 @@ const t = ui[lang].hud;
     text-overflow: ellipsis;
   }
 
-  .hud__track {
-    display: block;
-    width: 56px;
-    height: 3px;
-    overflow: hidden;
-    border-radius: 980px;
-    background: rgb(245 242 244 / 0.16);
+  /* La píldora de Apple: un punto por sección, y el activo se estira y se llena. */
+  .hud__segs {
+    display: flex;
+    align-items: center;
+    gap: 5px;
   }
 
-  .hud__fill {
+  .hud__segs i {
+    position: relative;
     display: block;
-    height: 100%;
+    width: 6px;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 980px;
+    background: rgb(245 242 244 / 0.24);
+    transition:
+      width 0.32s var(--ease-apple),
+      background-color 0.32s var(--ease-apple);
+  }
+
+  .hud__segs i.is-done {
     background: var(--color-text);
-    transform: scaleX(0);
+  }
+
+  .hud__segs i.is-active {
+    width: 26px;
+  }
+
+  .hud__segs b {
+    position: absolute;
+    inset: 0;
+    background: var(--color-text);
+    transform: scaleX(var(--p, 0));
     transform-origin: left;
+  }
+
+  .hud {
+    transition: opacity 0.32s var(--ease-apple);
+  }
+
+  /* Entre secciones el HUD se aparta: la página es la protagonista. */
+  .hud[data-idle='true'] {
+    opacity: 0.55;
+  }
+
+  .hud[data-idle='true'] .hud__circle,
+  .hud[data-idle='true'] .hud__skip {
+    display: none;
   }
 
   .hud__circle {
@@ -179,7 +212,7 @@ const t = ui[lang].hud;
 
   .hud[data-state='done'] .hud__circle,
   .hud[data-state='done'] .hud__skip,
-  .hud[data-state='done'] .hud__track {
+  .hud[data-state='done'] .hud__segs {
     display: none;
   }
 
@@ -217,7 +250,7 @@ const t = ui[lang].hud;
   }
 
   @media (max-width: 480px) {
-    .hud__track,
+    .hud__segs,
     .hud__dots {
       display: none;
     }

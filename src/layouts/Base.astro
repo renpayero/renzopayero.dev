@@ -30,7 +30,6 @@ const t = ui[lang];
         var root = document.documentElement;
         root.dataset.js = '';
         var params = new URLSearchParams(location.search);
-        if (params.get('neon')) root.dataset.neon = params.get('neon');
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         if (params.get('build') === '0') return;
         var WEEK = 6048e5;
@@ -44,7 +43,10 @@ const t = ui[lang];
         if (seen && !replay && params.get('build') !== '1') return;
         root.dataset.build = 'pending';
         setTimeout(function () {
-          if (root.dataset.build === 'pending') root.dataset.build = 'off';
+          if (root.dataset.build === 'pending') {
+            root.dataset.build = 'off';
+            dispatchEvent(new Event('rp:release'));
+          }
         }, 3500);
       })();
     </script>
@@ -53,6 +55,9 @@ const t = ui[lang];
     <a href="#main" class="skip-link">{t.skip}</a>
     <BuildHud lang={lang} />
     <slot />
+    <script>
+      import '../motion/reveal';
+    </script>
   </body>
 </html>
 

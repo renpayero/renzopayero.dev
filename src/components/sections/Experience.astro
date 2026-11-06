@@ -1,0 +1,223 @@
+---
+import { content } from '../../i18n/content';
+import type { Lang } from '../../i18n/ui';
+import { buildRows, GRAPH_WIDTH, TOP } from '../../lib/git-graph';
+
+interface Props {
+  lang: Lang;
+}
+
+const c = content[Astro.props.lang].experience;
+const rows = buildRows();
+const today = rows[rows.length - 1];
+---
+<section id="experiencia" class="section experience" data-section="experiencia">
+  <div class="wrap experience__layout">
+    <header class="experience__head">
+      <h2 class="h2" data-type data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
+    </header>
+
+    <ol class="git">
+      {
+        c.commits.map((commit, i) => {
+          const row = rows[i];
+          return (
+            <li class="git__row">
+              <div class="git__graph" aria-hidden="true">
+                <div class="git__lines">
+                  <svg class="git__top" viewBox={`0 0 ${GRAPH_WIDTH} ${TOP}`} width={GRAPH_WIDTH} height={TOP}>
+                    {row?.top.map((s) => <path d={s.d} class:list={['git__path', { 'is-live': s.live }]} />)}
+                  </svg>
+                  <svg class="git__rest" viewBox={`0 0 ${GRAPH_WIDTH} 100`} preserveAspectRatio="none">
+                    {row?.rest.map((s) => <path d={s.d} class:list={['git__path', { 'is-live': s.live }]} vector-effect="non-scaling-stroke" />)}
+                  </svg>
+                </div>
+                <span class:list={['git__dot', { 'is-live': row?.commitLive }]} style={`left:${row?.commitX}px;top:${row?.commitY}px`} />
+              </div>
+              <div class="git__body reveal" data-frame style="--reveal-y:16px">
+                <time class="git__when mono">{commit.when}</time>
+                <h3 class="git__title">{commit.title}</h3>
+                <p class="git__org">{commit.org}</p>
+                {'text' in commit && commit.text && <p class="git__text">{commit.text}</p>}
+              </div>
+            </li>
+          );
+        })
+      }
+      <li class="git__row git__row--now">
+        <div class="git__graph" aria-hidden="true">
+          <div class="git__lines">
+            <svg class="git__top" viewBox={`0 0 ${GRAPH_WIDTH} ${TOP}`} width={GRAPH_WIDTH} height={TOP}>
+              {today?.top.map((s) => <path d={s.d} class:list={['git__path', { 'is-live': s.live }]} />)}
+            </svg>
+          </div>
+        </div>
+        <div class="git__body reveal" style="--reveal-y:16px">
+          <p class="git__now">{c.now}</p>
+          <p class="git__text">{c.active}</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<style is:global>
+  .experience__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: start;
+    gap: clamp(32px, 5vw, 80px);
+  }
+
+  .experience__head {
+    position: sticky;
+    top: clamp(72px, 12svh, 120px);
+  }
+
+  .git {
+    list-style: none;
+  }
+
+  .git__row {
+    view-timeline: --git-row block;
+    position: relative;
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: clamp(12px, 2vw, 24px);
+  }
+
+  .git__graph {
+    position: relative;
+    align-self: stretch;
+  }
+
+  .git__lines {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .git__top {
+    flex: none;
+    overflow: visible;
+  }
+
+  .git__rest {
+    display: block;
+    flex: 1;
+    width: 76px;
+    min-height: 0;
+  }
+
+  .git__path {
+    fill: none;
+    stroke: rgb(143 143 143 / 0.55);
+    stroke-width: 1.5;
+  }
+
+  .git__path.is-live {
+    stroke: var(--color-text);
+    filter: drop-shadow(0 0 3px var(--color-odoo)) drop-shadow(0 0 8px var(--color-odoo));
+  }
+
+  .git__dot {
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
+    background: var(--color-gris);
+    transform: translate(-50%, -50%);
+  }
+
+  .git__dot.is-live {
+    background: var(--color-text);
+    box-shadow:
+      0 0 6px var(--color-odoo),
+      0 0 16px var(--color-odoo);
+  }
+
+  .git__body {
+    padding-block: 24px clamp(28px, 4vw, 44px);
+  }
+
+  .git__when {
+    color: var(--color-gris);
+  }
+
+  .git__title {
+    margin-top: 6px;
+    font-size: clamp(1.1875rem, 1.9vw, 1.5rem);
+    font-weight: 600;
+    line-height: 1.16;
+    letter-spacing: -0.01em;
+  }
+
+  .git__org {
+    margin-top: 2px;
+    color: var(--color-gris);
+    font-size: 1.0625rem;
+  }
+
+  .git__text {
+    max-width: 52ch;
+    margin-top: 10px;
+    color: var(--color-gris);
+    line-height: 1.42;
+  }
+
+  .git__now {
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+  }
+
+  @media (max-width: 899px) {
+    .experience__layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .experience__head {
+      position: static;
+    }
+  }
+
+  /* Las ramas se dibujan a medida que cada fila entra en pantalla. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .git__lines {
+        /* Entre filas la cabeza es la misma: arranca con el tope a 70vh y termina con la base a 70vh. */
+        animation: git-draw linear both;
+        animation-timeline: view();
+        animation-range: entry 30vh entry calc(100% + 30vh);
+      }
+
+      .git__dot {
+        animation: git-dot linear both;
+        animation-timeline: --git-row;
+        animation-range: entry calc(30vh + 24px) entry calc(30vh + 60px);
+      }
+
+      @keyframes git-draw {
+        from {
+          clip-path: inset(-4px -24px 100% -24px);
+        }
+        to {
+          clip-path: inset(-4px -24px -4px -24px);
+        }
+      }
+
+      @keyframes git-dot {
+        from {
+          opacity: 0;
+          scale: 0.4;
+        }
+        to {
+          opacity: 1;
+          scale: 1;
+        }
+      }
+    }
+  }
+</style>

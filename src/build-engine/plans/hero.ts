@@ -1,53 +1,14 @@
 import gsap from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { SplitText } from 'gsap/SplitText';
-import { travel, type Crew } from '../agents';
-import type { Frame, Guide, Note, Overlay } from '../overlay';
-import type { RoleId } from '../../i18n/ui';
+import { travel } from '../agents';
+import { contrast, docRect, need } from '../dom';
+import type { Frame, Guide, Note } from '../overlay';
+import type { PlanContext } from './context';
 
 gsap.registerPlugin(SplitText, CustomEase);
 // Medidas en Apple: docs/referencia-apple.md
 CustomEase.create('entrada', '0.28,0.11,0.32,1');
-
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface PlanContext {
-  overlay: Overlay;
-  crew: Crew;
-  announce: (role: RoleId | 'go-live') => void;
-  onCleanup: (fn: () => void) => void;
-}
-
-const docRect = (el: Element): Rect => {
-  const r = el.getBoundingClientRect();
-  return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height };
-};
-
-const need = <T extends Element>(root: ParentNode, selector: string): T => {
-  const el = root.querySelector<T>(selector);
-  if (!el) throw new Error(`falta ${selector}`);
-  return el;
-};
-
-/** Contraste WCAG real, medido sobre lo que el navegador está pintando. */
-function contrast(el: Element): number {
-  const lum = (css: string): number => {
-    const parts = css.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
-    const [r = 0, g = 0, b = 0] = parts.map((v) => {
-      const c = v / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const fg = lum(getComputedStyle(el).color);
-  const bg = lum(getComputedStyle(document.documentElement).backgroundColor);
-  return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
-}
 
 /**
  * Orden del hero. Protagonista: el nombre. Apoyo: lema, CTA y retrato. Decoración: nav.
@@ -235,9 +196,7 @@ export function heroPlan(root: HTMLElement, ctx: PlanContext): gsap.core.Timelin
   tl.to(ambient, { opacity: 1, duration: 0.8, ease: 'entrada' }, live + 0.42);
 
   // Se apagan las herramientas: los agentes vuelven al HUD y queda la página sola.
-  const hud = document.querySelector('[data-hud]')?.getBoundingClientRect();
-  const homeX = hud ? hud.left + hud.width / 2 : innerWidth / 2;
-  const homeY = (hud ? hud.top + hud.height / 2 : innerHeight - 40) + scrollY;
+  const { x: homeX, y: homeY } = ctx.dock();
   crew.all.forEach((agent, i) => {
     const at = 3.12 + (i % 5) * 0.03;
     tl.to(agent, { tag: 0, duration: 0.12 }, at);

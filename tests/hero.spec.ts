@@ -8,6 +8,8 @@ const HIDE_TOOLS = '.hud, .hud-replay { display: none !important; }';
 const state = (page: Page) => page.evaluate(() => document.documentElement.dataset.build ?? null);
 const waitDone = (page: Page, timeout = 8000) =>
   page.waitForFunction(() => document.documentElement.dataset.build === 'done', undefined, { timeout });
+const heroBuilt = (page: Page, timeout = 8000) =>
+  page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('.hero')?.dataset ?? {}), undefined, { timeout });
 const engineReady = (page: Page) => page.waitForFunction(() => Boolean(window.__rpBuild), undefined, { timeout: 8000 });
 
 async function fontsReady(page: Page) {
@@ -52,9 +54,8 @@ test.describe('primer build', () => {
   test('el nombre es visible desde el primer pintado y el build termina', async ({ page }) => {
     await page.goto('/?build=1', { waitUntil: 'commit' });
     await expect(page.locator('.name__off').first()).toHaveCSS('opacity', '1');
-    await waitDone(page);
-    await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
-    await expect(page.locator('canvas')).toHaveCount(0);
+    await heroBuilt(page);
+    await expect(page.locator('[data-hud-text]')).toContainText(/\d de \d secciones/);
     await expect(page.locator('.name__lit').first()).toHaveCSS('opacity', '1');
     await expect(page.locator('.lede')).toHaveCSS('opacity', '1');
   });
@@ -65,7 +66,7 @@ test.describe('primer build', () => {
     const built = await browser.newContext({ viewport: size });
     const a = await built.newPage();
     await a.goto(`${baseURL}/?build=1`);
-    await waitDone(a);
+    await heroBuilt(a);
     await a.addStyleTag({ content: HIDE_TOOLS });
     await fontsReady(a);
     await a.waitForTimeout(300);
@@ -110,29 +111,28 @@ test.describe('interrupciones', () => {
     const toggle = page.locator('[data-hud-toggle]');
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-label', 'Seguir');
-    const t1 = await page.evaluate(() => window.__rpBuild?.timeline.time());
+    const t1 = await page.evaluate(() => window.__rpBuild?.timeline?.time());
     await page.waitForTimeout(400);
-    const t2 = await page.evaluate(() => window.__rpBuild?.timeline.time());
+    const t2 = await page.evaluate(() => window.__rpBuild?.timeline?.time());
     expect(t2).toBe(t1);
     expect(await state(page)).toBe('running');
     await toggle.click();
-    await waitDone(page);
+    await heroBuilt(page);
   });
 
   test('cambiar el ancho a mitad del build no deja la página rota', async ({ page, viewport }) => {
     await page.goto('/?build=1');
     await engineReady(page);
     await page.setViewportSize({ width: (viewport?.width ?? 1440) - 120, height: viewport?.height ?? 900 });
-    await waitDone(page, 1500);
+    await heroBuilt(page, 1500);
     await expect(page.locator('.lede')).toHaveCSS('opacity', '1');
-    await expect(page.locator('canvas')).toHaveCount(0);
   });
 
   test('cambiar solo el alto (barra del navegador) no interrumpe', async ({ page, viewport }) => {
     await page.goto('/?build=1');
     await engineReady(page);
     await page.evaluate(() => {
-      window.__rpBuild?.timeline.pause();
+      window.__rpBuild?.timeline?.pause();
     });
     await page.setViewportSize({ width: viewport?.width ?? 1440, height: (viewport?.height ?? 900) - 60 });
     await page.waitForTimeout(150);
@@ -143,11 +143,11 @@ test.describe('interrupciones', () => {
     await page.goto('/?build=1');
     await engineReady(page);
     await page.evaluate(() => {
-      window.__rpBuild?.timeline.pause();
-      window.__rpBuild?.timeline.play();
-      scrollTo(0, document.documentElement.scrollHeight);
+      window.__rpBuild?.timeline?.pause();
+      window.__rpBuild?.timeline?.play();
+      scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
     });
-    await waitDone(page, 1500);
+    await heroBuilt(page, 1500);
   });
 
   test('si el motor no carga, el watchdog libera la página', async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe('interrupciones', () => {
 test.describe('visita repetida', () => {
   test('no espera ni descarga el motor, y puede reconstruir', async ({ page }) => {
     await page.goto('/?build=1');
-    await waitDone(page);
+    await heroBuilt(page);
 
     const chunks: string[] = [];
     page.on('request', (r) => {
@@ -177,7 +177,75 @@ test.describe('visita repetida', () => {
     await page.locator('[data-hud-replay]').click();
     await engineReady(page);
     expect(await state(page)).toBe('running');
+    await heroBuilt(page);
+  });
+});
+
+test.describe('secciones', () => {
+  const go = (page: Page, selector: string) =>
+    page.evaluate((sel) => {
+      const top = (document.querySelector(sel)?.getBoundingClientRect().top ?? 0) + scrollY;
+      scrollTo({ top, behavior: 'instant' });
+    }, selector);
+  const allTyped = (page: Page) =>
+    page.evaluate(() => [...document.querySelectorAll('[data-type]')].every((el) => getComputedStyle(el).opacity === '1'));
+
+  test('recorrido normal: se construye todo e informa un tiempo real', async ({ page }) => {
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    const sections = await page.evaluate(() => [...document.querySelectorAll('[data-section]')].map((s) => `[data-section="${(s as HTMLElement).dataset.section}"]`));
+    for (const selector of sections.slice(1)) {
+      await go(page, selector);
+      await page.waitForFunction((sel) => 'built' in (document.querySelector<HTMLElement>(sel)?.dataset ?? {}), selector, { timeout: 8000 });
+    }
     await waitDone(page);
+    await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
+    await expect(page.locator('canvas')).toHaveCount(0);
+    expect(await allTyped(page)).toBe(true);
+  });
+
+  test('scroll rápido al final: nada queda colgado y al volver se construye', async ({ page }) => {
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    await go(page, '#contacto');
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('#contacto')?.dataset ?? {}), undefined, { timeout: 8000 });
+    await expect(page.locator('.contact__lit')).toBeVisible();
+    await go(page, '#experiencia');
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('#experiencia')?.dataset ?? {}), undefined, { timeout: 8000 });
+    await expect(page.locator('#experiencia h2')).toHaveCSS('opacity', '1');
+  });
+
+  test('saltar deja toda la página final', async ({ page }) => {
+    await page.goto('/?build=1');
+    await engineReady(page);
+    await page.locator('[data-hud-skip]').click();
+    await waitDone(page, 500);
+    expect(await allTyped(page)).toBe(true);
+    const hidden = await page.evaluate(() => document.querySelectorAll('.reveal:not(.is-in)').length);
+    expect(hidden).toBe(0);
+    await expect(page.locator('canvas')).toHaveCount(0);
+  });
+
+  test('sin JS y con reduced motion se lee todo sin animar', async ({ browser, baseURL }) => {
+    for (const options of [{ javaScriptEnabled: false }, { reducedMotion: 'reduce' as const }]) {
+      const context = await browser.newContext(options);
+      const page = await context.newPage();
+      await page.goto(`${baseURL}/`);
+      for (const text of ['Una empresa es un solo sistema.', 'Jefe de Sistemas', 'Lo que traigo a un equipo.']) {
+        await expect(page.getByText(text).first()).toBeVisible();
+      }
+      await expect(page.locator('.reveal').first()).toHaveCSS('opacity', '1');
+      await expect(page.locator('a[href$="renzo-payero-cv-es.pdf"]')).toBeVisible();
+      await context.close();
+    }
+  });
+
+  test('los CV se descargan', async ({ request }) => {
+    for (const lang of ['es', 'en']) {
+      const res = await request.get(`/cv/renzo-payero-cv-${lang}.pdf`);
+      expect(res.status()).toBe(200);
+      expect(res.headers()['content-type']).toContain('pdf');
+    }
   });
 });
 
@@ -196,10 +264,10 @@ test.describe('calidad', () => {
 
   test('axe sin violaciones al final del build', async ({ page }) => {
     await page.goto('/?build=1');
-    await waitDone(page);
+    await heroBuilt(page);
     // axe no evalúa -webkit-text-stroke. WCAG toma el contorno como borde de la letra:
     // el del nombre (#F5F2F4 sobre #0B070A) da 18:1. Solo se excluye ese elemento.
-    const results = await new AxeBuilder({ page }).exclude('.name__lit').analyze();
+    const results = await new AxeBuilder({ page }).exclude('.name__lit').exclude('.contact__lit').analyze();
     expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`)).toEqual([]);
   });
 
@@ -207,7 +275,7 @@ test.describe('calidad', () => {
     await page.goto('/?build=1');
     await engineReady(page);
     await page.evaluate(() => {
-      window.__rpBuild?.timeline.pause();
+      window.__rpBuild?.timeline?.pause();
     });
     // Durante el build el texto entra de a poco: el contraste se valida al final.
     const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
@@ -250,7 +318,7 @@ test.describe('rendimiento', () => {
         }).observe({ type: 'layout-shift', buffered: true });
       });
       await page.goto(`${baseURL}/?build=1`);
-      await waitDone(page, 20_000);
+      await heroBuilt(page, 20_000);
       const m = await page.evaluate(() => {
         const w = window as unknown as { __lcp: number; __lcpEl: string; __cls: number };
         return { lcp: Math.round(w.__lcp), el: w.__lcpEl, cls: Number(w.__cls.toFixed(4)) };

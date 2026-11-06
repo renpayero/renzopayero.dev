@@ -223,11 +223,6 @@ const t = ui[lang];
     fill: var(--color-surface);
   }
 
-  [data-neon='c'] .name__lit {
-    color: var(--color-text);
-    -webkit-text-stroke: 0;
-  }
-
   .lede {
     max-width: 30ch;
     margin-top: clamp(28px, 5svh, 48px);
@@ -333,27 +328,22 @@ const t = ui[lang];
   }
 
   /* Estado durante el build. Sin JS nada de esto aplica y se ve el estado final. */
-  [data-build='pending'] .name__off,
-  [data-build='running'] .name__off {
+  :is([data-build='pending'], [data-build='running']) .hero:not([data-built]) .name__off {
     opacity: 1;
   }
 
   /* 0.001 y no 0: se pintan desde el inicio y al encenderse no cuentan como un LCP nuevo. */
-  [data-build='pending'] .name__lit,
-  [data-build='pending'] .name__halo,
-  [data-build='running'] .name__lit,
-  [data-build='running'] .name__halo {
+  :is([data-build='pending'], [data-build='running']) .hero:not([data-built]) :is(.name__lit, .name__halo) {
     opacity: 0.001;
     will-change: opacity;
   }
 
-  [data-build='pending'] .hero__ambient,
-  [data-build='running'] .hero__ambient {
+  :is([data-build='pending'], [data-build='running']) .hero:not([data-built]) .hero__ambient {
     opacity: 0;
     will-change: opacity;
   }
 
-  [data-build='running'] .name__trace {
+  [data-build='running'] .hero:not([data-built]) .name__trace {
     display: block;
   }
 
@@ -370,5 +360,46 @@ const t = ui[lang];
 
   [data-build='pending'] .portrait__fill {
     transform: scaleY(0);
+  }
+
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .hero__copy {
+        animation: hero-copy-out linear both;
+        animation-timeline: view();
+        animation-range: exit 0% exit 90%;
+      }
+
+      .portrait {
+        animation: hero-portrait-out linear both;
+        animation-timeline: view();
+        animation-range: exit -20% exit 70%;
+      }
+
+      .hero__ambient {
+        animation: hero-ambient-out linear both;
+        animation-timeline: view();
+        animation-range: exit 0% exit 80%;
+      }
+
+      @keyframes hero-copy-out {
+        to {
+          opacity: 0.2;
+          transform: translateY(-6%);
+        }
+      }
+
+      @keyframes hero-portrait-out {
+        to {
+          transform: translateY(-4%) scale(0.96);
+        }
+      }
+
+      @keyframes hero-ambient-out {
+        to {
+          transform: translateY(12%);
+        }
+      }
+    }
   }
 </style>

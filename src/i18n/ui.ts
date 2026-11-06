@@ -25,6 +25,7 @@ export const ui = {
       replay: 'Volver a construir',
       agents: 'agentes',
       built: (n: number, s: string) => `Construido por ${n} agentes en ${s} s`,
+      progress: (done: number, total: number) => `${done} de ${total} secciones`,
       goLive: 'Go-live',
     },
     roles: {
@@ -59,6 +60,7 @@ export const ui = {
       replay: 'Build it again',
       agents: 'agents',
       built: (n: number, s: string) => `Built by ${n} agents in ${s} s`,
+      progress: (done: number, total: number) => `${done} of ${total} sections`,
       goLive: 'Go-live',
     },
     roles: {

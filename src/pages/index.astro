@@ -1,12 +1,20 @@
 ---
 import Base from '../layouts/Base.astro';
+import Capabilities from '../components/sections/Capabilities.astro';
+import Contact from '../components/sections/Contact.astro';
+import Experience from '../components/sections/Experience.astro';
 import Hero from '../components/sections/Hero.astro';
+import Manifesto from '../components/sections/Manifesto.astro';
+import System from '../components/sections/System.astro';
 ---
 <Base lang="es">
   <main id="main">
     <Hero lang="es" />
+    <Manifesto lang="es" />
+    <System lang="es" />
     <section id="proyectos" class="flex min-h-[60vh] items-center justify-center text-gris">Proyectos</section>
-    <section id="experiencia" class="flex min-h-[60vh] items-center justify-center text-gris">Experiencia</section>
-    <section id="contacto" class="flex min-h-[60vh] items-center justify-center text-gris">Contacto</section>
+    <Experience lang="es" />
+    <Capabilities lang="es" />
+    <Contact lang="es" />
   </main>
 </Base>

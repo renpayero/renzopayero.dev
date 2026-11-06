@@ -1,0 +1,76 @@
+---
+import { content } from '../../i18n/content';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const c = content[Astro.props.lang].manifesto;
+const words = c.statement.split(' ');
+---
+<section class="manifesto" data-section="manifiesto">
+  <div class="manifesto__pin">
+    <div class="wrap">
+      <p class="manifesto__text" data-frame style={`--n:${words.length}`}>
+        {words.map((word, i) => <span class="manifesto__word" style={`--i:${i}`}>{word}{' '}</span>)}
+      </p>
+      <p class="body-l manifesto__detail reveal" data-frame>{c.detail}</p>
+    </div>
+  </div>
+</section>
+
+<style is:global>
+  .manifesto {
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .manifesto__pin {
+    display: flex;
+    align-items: center;
+    min-height: 100svh;
+    padding-block: 96px;
+  }
+
+  .manifesto__text {
+    max-width: 19ch;
+    font-size: clamp(2.5rem, 6.4vw, 5.5rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .manifesto__detail {
+    margin-top: clamp(28px, 4vw, 48px);
+  }
+
+  /* Cada palabra se enciende con el scroll. Sin soporte o con reduced motion, todas encendidas. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .manifesto {
+        height: 240svh;
+        view-timeline: --manifesto block;
+      }
+
+      .manifesto__pin {
+        position: sticky;
+        top: 0;
+      }
+
+      .manifesto__word {
+        animation: word-on linear both;
+        animation-timeline: --manifesto;
+        animation-range: contain calc(var(--i) / var(--n) * 70%) contain calc((var(--i) + 1.6) / var(--n) * 70%);
+      }
+
+      @keyframes word-on {
+        from {
+          opacity: 0.16;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+    }
+  }
+</style>

@@ -1,0 +1,347 @@
+---
+import { content } from '../../i18n/content';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const c = content[Astro.props.lang].system;
+
+const polar = (degrees: number, radius: number) => {
+  const angle = ((degrees - 90) * Math.PI) / 180;
+  return { x: 50 + radius * Math.cos(angle), y: 50 + radius * Math.sin(angle) };
+};
+
+const INNER = 29;
+const OUTER = 44;
+const nodes = c.nodes.map((label, i) => ({ label, angle: i * 60, ...polar(i * 60, INNER) }));
+// Cada integración cuelga del módulo con el que se conecta en la vida real, sin cruzar a otros.
+const parents = [
+  { node: 0, delta: 0 },
+  { node: 2, delta: 0 },
+  { node: 3, delta: -22 },
+  { node: 3, delta: 22 },
+  { node: 4, delta: 0 },
+  { node: 5, delta: 0 },
+];
+const links = c.links.map((label, i) => {
+  const { node, delta } = parents[i] ?? { node: 0, delta: 0 };
+  const parent = nodes[node] ?? { x: 50, y: 50, angle: 0 };
+  return { label, parent, ...polar(parent.angle + delta, OUTER) };
+});
+---
+<section class="system" data-section="sistema">
+  <div class="section system__intro">
+    <div class="wrap">
+      <h2 class="h2" data-type data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
+      <p class="body-l system__lead reveal" data-frame>{c.lead}</p>
+    </div>
+  </div>
+
+  <div class="system__scene">
+    <div class="system__pin">
+      <div class="wrap system__layout">
+        <div class="system__stage" aria-hidden="true">
+          <svg class="system__wires" viewBox="0 0 100 100">
+            {
+              links.map((l, i) => (
+                <line class="wire wire--link" style={`--s:${54 + i * 2.5}`} pathLength="1" x1={l.parent.x} y1={l.parent.y} x2={l.x} y2={l.y} />
+              ))
+            }
+            {
+              nodes.map((n, i) => (
+                <line class="wire" style={`--s:${8 + i * 7}`} pathLength="1" x1="50" y1="50" x2={n.x} y2={n.y} />
+              ))
+            }
+          </svg>
+          <span class="system__core">{c.core}</span>
+          {
+            nodes.map((n, i) => (
+              <span class="system__node" style={`left:${n.x}%;top:${n.y}%;--s:${12 + i * 7}`}>{n.label}</span>
+            ))
+          }
+          {
+            links.map((l, i) => (
+              <span class="system__link" style={`left:${l.x}%;top:${l.y}%;--s:${58 + i * 2.5}`}>{l.label}</span>
+            ))
+          }
+        </div>
+
+        <dl class="system__stats">
+          {
+            c.stats.map((s, i) => (
+              <div class="system__stat" style={`--s:${74 + i * 6}`}>
+                <dd class="system__value">{s.value}</dd>
+                <dt class="system__label">{s.label}</dt>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+    </div>
+  </div>
+  <ul class="sr-only">
+    {c.nodes.map((n) => <li>{n}</li>)}
+    {c.links.map((n) => <li>{n}</li>)}
+  </ul>
+</section>
+
+<style is:global>
+  .system__intro {
+    padding-bottom: clamp(32px, 5vw, 64px);
+  }
+
+  .system__lead {
+    margin-top: 20px;
+  }
+
+  .system__scene {
+    overflow-x: clip;
+    padding-inline: clamp(16px, 3vw, 24px);
+    padding-bottom: clamp(48px, 6vw, 96px);
+  }
+
+  .system__pin {
+    display: flex;
+    align-items: center;
+    min-height: 100svh;
+  }
+
+  .system__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    align-items: center;
+    gap: clamp(24px, 4vw, 64px);
+  }
+
+  .system__stage {
+    position: relative;
+    width: min(100%, 76svh);
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+
+  .system__wires {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .wire {
+    stroke: var(--color-odoo);
+    stroke-width: 0.45;
+    stroke-dasharray: 1;
+  }
+
+  .wire--link {
+    stroke: var(--color-gris);
+    stroke-width: 0.18;
+    opacity: 0.6;
+  }
+
+  .system__core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 26%;
+    aspect-ratio: 1;
+    border: 2px solid var(--color-text);
+    border-radius: 50%;
+    background: var(--color-odoo);
+    box-shadow:
+      0 0 24px var(--color-odoo),
+      0 0 72px var(--color-odoo),
+      0 0 160px rgb(113 75 103 / 0.7);
+    font-size: clamp(1.25rem, 3.4vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    transform: translate(-50%, -50%);
+  }
+
+  .system__node,
+  .system__link {
+    position: absolute;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+  }
+
+  .system__node {
+    padding: 0.5em 0.95em;
+    border: 1px solid rgb(245 242 244 / 0.14);
+    border-radius: 980px;
+    background: var(--color-surface);
+    font-size: clamp(0.75rem, 1.15vw, 0.9375rem);
+    font-weight: 500;
+  }
+
+  .system__link {
+    max-width: 7.5em;
+    text-align: center;
+    white-space: normal;
+    color: var(--color-gris);
+    font-family: var(--font-mono);
+    font-size: clamp(0.625rem, 0.85vw, 0.75rem);
+    padding: 0.2em 0.5em;
+    background: var(--color-bg);
+  }
+
+  .system__stats {
+    display: grid;
+    gap: clamp(20px, 3.4vh, 36px);
+  }
+
+  .system__stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .system__value {
+    font-size: clamp(2.25rem, 4.4vw, 3.5rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+  }
+
+  .system__label {
+    max-width: 26ch;
+    margin-top: 4px;
+    color: var(--color-gris);
+    font-size: 1.0625rem;
+    line-height: 1.3;
+  }
+
+  @media (max-width: 767px) {
+    .system__layout {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .system__stage {
+      width: min(100%, 52svh);
+    }
+
+    .system__stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .system__value {
+      font-size: clamp(1.125rem, 5.4vw, 1.5rem);
+    }
+
+    .system__label {
+      font-size: 0.75rem;
+    }
+  }
+
+  /* El sistema se ensambla con el scroll. Sin soporte o con reduced motion, ya está armado. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .system__scene {
+        height: 340svh;
+        view-timeline: --system block;
+      }
+
+      .system__pin {
+        position: sticky;
+        top: 0;
+        height: 100svh;
+      }
+
+      .wire,
+      .system__node,
+      .system__link,
+      .system__stat,
+      .system__stage,
+      .system__core {
+        animation-timeline: --system;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+      }
+
+      .wire {
+        animation-name: wire-draw;
+        animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
+      }
+
+      .system__node,
+      .system__link {
+        animation-name: node-in;
+        animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
+      }
+
+      .system__stat {
+        animation-name: stat-in;
+        animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
+      }
+
+      /* El objeto se aleja mientras entran los datos: el patrón de cámaras de Apple. */
+      .system__stage {
+        animation-name: stage-out;
+        animation-range: contain 0% contain 88%;
+      }
+
+      .system__core {
+        animation-name: core-in;
+        animation-range: contain 0% contain 10%;
+      }
+
+      @keyframes wire-draw {
+        from {
+          stroke-dashoffset: 1;
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+
+      @keyframes node-in {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.86);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      @keyframes stat-in {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes stage-out {
+        0%,
+        62% {
+          transform: scale(1.14);
+        }
+        100% {
+          transform: scale(0.94);
+        }
+      }
+
+      @keyframes core-in {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.7);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+    }
+  }
+</style>
