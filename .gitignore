@@ -14,3 +14,6 @@ _fuentes/
 # Salidas de pruebas
 test-results/
 playwright-report/
+
+# Estado local de Claude Code
+.claude/scheduled_tasks.lock
