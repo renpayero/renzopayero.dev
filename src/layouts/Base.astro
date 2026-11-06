@@ -10,12 +10,32 @@ interface Props {
   description?: string;
   /** Solo la home se construye: en una página interna el visitante viene a leer. */
   build?: boolean;
+  /** Ruta sin prefijo de idioma, para canonical y hreflang. `null` en páginas sin par. */
+  path?: string | null;
+  /** Imagen para compartir, en `public/og/`. */
+  og?: string;
 }
 
-const { lang, build = true } = Astro.props;
+const { lang, build = true, path = '/', og = `home-${lang}` } = Astro.props;
 const t = ui[lang];
 const title = Astro.props.title ?? t.meta.title;
 const description = Astro.props.description ?? t.meta.description;
+const site = Astro.site;
+const urlFor = (l: Lang, p: string): string => {
+  const local = l === 'es' ? p : `/en${p}`;
+  return site ? new URL(local, site).href : local;
+};
+const ogImage = site ? new URL(`/og/${og}.png`, site).href : `/og/${og}.png`;
+const person = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Renzo Payero',
+  jobTitle: lang === 'es' ? 'Ingeniero en Sistemas' : 'Systems Engineer',
+  email: 'mailto:rpayerodev@gmail.com',
+  address: { '@type': 'PostalAddress', addressLocality: 'Rosario', addressRegion: 'Santa Fe', addressCountry: 'AR' },
+  sameAs: ['https://www.linkedin.com/in/renzopayero/', 'https://dakodev.com/'],
+  worksFor: { '@type': 'Organization', name: 'Dakodev', url: 'https://dakodev.com/' },
+};
 ---
 <!doctype html>
 <html lang={lang}>
@@ -25,6 +45,21 @@ const description = Astro.props.description ?? t.meta.description;
     <meta name="theme-color" content="#0b070a" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {path !== null && <link rel="canonical" href={urlFor(lang, path)} />}
+    {path !== null && <link rel="alternate" hreflang="es" href={urlFor('es', path)} />}
+    {path !== null && <link rel="alternate" hreflang="en" href={urlFor('en', path)} />}
+    {path !== null && <link rel="alternate" hreflang="x-default" href={urlFor('es', path)} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content={lang === 'es' ? 'es_AR' : 'en_US'} />
+    {path !== null && <meta property="og:url" content={urlFor(lang, path)} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    {path === '/' && <script type="application/ld+json" set:html={JSON.stringify(person)} />}
     <Font cssVariable="--font-inter" preload />
     <Font cssVariable="--font-geist" />
     <!--
@@ -45,7 +80,11 @@ const description = Astro.props.description ?? t.meta.description;
         try {
           seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < WEEK;
           replay = sessionStorage.getItem('rp-replay') === '1';
-          sessionStorage.removeItem('rp-replay');
+          if (replay) {
+            sessionStorage.removeItem('rp-replay');
+            root.dataset.autopilot = '';
+            history.scrollRestoration = 'manual';
+          }
         } catch (e) {}
         if (seen && !replay && params.get('build') !== '1') return;
         root.dataset.build = 'pending';
@@ -60,7 +99,7 @@ const description = Astro.props.description ?? t.meta.description;
   </head>
   <body>
     <a href="#main" class="skip-link">{t.skip}</a>
-    <BuildHud lang={lang} />
+    {build && <BuildHud lang={lang} />}
     <slot />
     <script>
       import '../motion/reveal';

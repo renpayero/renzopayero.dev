@@ -152,6 +152,12 @@ export class Swarm {
     if (busy) this.endInspection();
   }
 
+  /** Toda la página construida: la órbita se abre de golpe y vuelve a respirar. */
+  celebrate(): void {
+    this.energy = 1;
+    this.burst(this.pointerX, this.pointerY + scrollY);
+  }
+
   private listen(): void {
     addEventListener(
       'pointermove',

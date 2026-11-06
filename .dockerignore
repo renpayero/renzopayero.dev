@@ -1,0 +1,14 @@
+node_modules
+dist
+.astro
+.cache
+.git
+.claude
+.mcp.json
+_fuentes
+test-results
+playwright-report
+tasks
+docs
+*.log
+.env*

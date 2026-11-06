@@ -9,7 +9,7 @@ export const ui = {
         'Ingeniero en Sistemas de Rosario, Argentina. Odoo de punta a punta, software a medida y agentes de IA para empresas reales.',
     },
     skip: 'Saltar al contenido',
-    nav: { projects: 'Proyectos', experience: 'Experiencia', contact: 'Hablemos', label: 'Principal' },
+    nav: { projects: 'Proyectos', experience: 'Experiencia', contact: 'Hablemos', label: 'Principal', sticky: 'Accesos rápidos', other: 'English' },
     hero: {
       role: 'Ingeniero en Sistemas.',
       focus: 'Odoo, software a medida y agentes de IA para empresas reales.',
@@ -44,7 +44,7 @@ export const ui = {
         'Systems engineer from Rosario, Argentina. End-to-end Odoo, custom software and AI agents for real businesses.',
     },
     skip: 'Skip to content',
-    nav: { projects: 'Projects', experience: 'Experience', contact: "Let's talk", label: 'Main' },
+    nav: { projects: 'Projects', experience: 'Experience', contact: "Let's talk", label: 'Main', sticky: 'Quick links', other: 'Español' },
     hero: {
       role: 'Systems engineer.',
       focus: 'Odoo, custom software and AI agents for real businesses.',

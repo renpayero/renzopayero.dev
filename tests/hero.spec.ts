@@ -315,7 +315,7 @@ test.describe('enjambre', () => {
     await page.mouse.move(40, 40);
     await page.mouse.move(42, 42);
     await page.waitForTimeout(500);
-    const box = await page.locator('.cta .btn--primary').boundingBox();
+    const box = await page.locator('.hero .cta .btn--primary').boundingBox();
     if (!box) throw new Error('sin botón');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
     await page.waitForTimeout(800);

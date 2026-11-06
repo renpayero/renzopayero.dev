@@ -1,0 +1,19 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        SITE_URL: ${SITE_URL:-}
+        BUILD_COMMITS: ${BUILD_COMMITS:-}
+    image: renzopayero/portfolio:latest
+    ports:
+      - "${PORT:-8080}:8080"
+    restart: unless-stopped
+    # Solo sirve archivos: sistema de archivos de solo lectura y sin privilegios de más.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

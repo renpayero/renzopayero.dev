@@ -8,7 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = ui[lang];
 ---
-<nav class="localnav" aria-label={t.nav.label}>
+<nav class="localnav" aria-label={t.nav.sticky}>
   <a class="localnav__brand" href={lang === 'es' ? '/' : '/en/'}>Renzo Payero</a>
   <div class="localnav__links">
     <a href="#proyectos">{t.nav.projects}</a>

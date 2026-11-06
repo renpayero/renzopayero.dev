@@ -16,6 +16,7 @@ const t = ui[lang];
   <nav class="topbar__nav" aria-label={t.nav.label}>
     <a href="#proyectos">{t.nav.projects}</a>
     <a href="#experiencia">{t.nav.experience}</a>
+    <a href={lang === 'es' ? '/en/' : '/'} hreflang={lang === 'es' ? 'en' : 'es'} lang={lang === 'es' ? 'en' : 'es'}>{t.nav.other}</a>
     <a class="topbar__cta" href="#contacto">{t.nav.contact}</a>
   </nav>
 </header>

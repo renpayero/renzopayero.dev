@@ -38,16 +38,26 @@ const t = ui[lang].hud;
     import('../../build-engine/run').then((engine) => engine.start());
   }
 
-  document.querySelector('[data-hud-replay]')?.addEventListener('click', () => {
+  // El build completo: si la página todavía se está construyendo arranca ya; si no, vuelve a empezar.
+  const fullBuild = (): void => {
+    if (root.dataset.build === 'running') {
+      dispatchEvent(new Event('rp:autopilot'));
+      return;
+    }
     try {
       sessionStorage.setItem('rp-replay', '1');
     } catch {
-      // Sin almacenamiento, ?build=1 fuerza el build igual.
+      // Sin almacenamiento, ?build=1 fuerza el build igual, aunque sin recorrido automático.
     }
-    scrollTo(0, 0);
+    scrollTo({ top: 0, behavior: 'instant' });
     const url = new URL(location.href);
     url.searchParams.set('build', '1');
+    url.hash = '';
     location.href = url.toString();
+  };
+
+  document.querySelectorAll('[data-hud-replay], [data-autopilot]').forEach((button) => {
+    button.addEventListener('click', fullBuild);
   });
 </script>
 

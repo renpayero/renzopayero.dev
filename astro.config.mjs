@@ -1,9 +1,17 @@
 // @ts-check
 import { defineConfig, fontProviders } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
+import buildStats from './integrations/build-stats.mjs';
+import cspMeta from './integrations/csp-meta.mjs';
+
+// El dominio se decide al desplegar: `SITE_URL=https://... npm run build` (o build-arg en Docker).
+const site = process.env.SITE_URL;
 
 export default defineConfig({
   output: 'static',
+  ...(site ? { site } : {}),
+  integrations: [buildStats(), ...(site ? [sitemap()] : []), cspMeta()],
   i18n: {
     defaultLocale: 'es',
     locales: ['es', 'en'],

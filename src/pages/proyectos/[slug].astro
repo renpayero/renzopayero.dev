@@ -9,7 +9,7 @@ export function getStaticPaths() {
 
 const { project } = Astro.props;
 ---
-<Base lang="es" title={`${project.name}. Renzo Payero`} description={project.summary} build={false}>
+<Base lang="es" title={`${project.name}. Renzo Payero`} description={project.summary} build={false} path={`/proyectos/${project.slug}/`} og={project.slug}>
   <main id="main">
     <ProjectCase lang="es" slug={project.slug as Slug} />
   </main>
