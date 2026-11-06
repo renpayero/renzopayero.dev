@@ -1,0 +1,77 @@
+---
+import { Font } from 'astro:assets';
+import '../styles/global.css';
+import BuildHud from '../components/hud/BuildHud.astro';
+import { ui, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b070a" />
+    <title>{t.meta.title}</title>
+    <meta name="description" content={t.meta.description} />
+    <Font cssVariable="--font-inter" preload />
+    <Font cssVariable="--font-geist" />
+    <!--
+      Decide antes del primer pintado si corre el build. Sin JS o con reduced motion
+      la página llega en su estado final. Si el motor no carga, el watchdog la libera.
+    -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        root.dataset.js = '';
+        var params = new URLSearchParams(location.search);
+        if (params.get('neon')) root.dataset.neon = params.get('neon');
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (params.get('build') === '0') return;
+        var WEEK = 6048e5;
+        var seen = false;
+        var replay = false;
+        try {
+          seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < WEEK;
+          replay = sessionStorage.getItem('rp-replay') === '1';
+          sessionStorage.removeItem('rp-replay');
+        } catch (e) {}
+        if (seen && !replay && params.get('build') !== '1') return;
+        root.dataset.build = 'pending';
+        setTimeout(function () {
+          if (root.dataset.build === 'pending') root.dataset.build = 'off';
+        }, 3500);
+      })();
+    </script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">{t.skip}</a>
+    <BuildHud lang={lang} />
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  .skip-link {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 60;
+    padding: 10px 16px;
+    border-radius: 980px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-weight: 600;
+    transform: translateY(-200%);
+    transition: transform 0.32s var(--ease-apple);
+  }
+
+  .skip-link:focus-visible {
+    transform: none;
+  }
+</style>

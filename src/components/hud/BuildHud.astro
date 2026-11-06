@@ -1,0 +1,231 @@
+---
+import pause from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
+import play from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
+import replay from '@phosphor-icons/core/assets/fill/arrow-clockwise-fill.svg?raw';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang].hud;
+---
+<aside aria-label={t.label}>
+<div class="hud" data-hud>
+  <div class="hud__pill">
+    <span class="hud__dots" data-hud-dots aria-hidden="true"></span>
+    <span class="hud__text" data-hud-text></span>
+    <span class="hud__track" aria-hidden="true"><span class="hud__fill" data-hud-fill></span></span>
+  </div>
+  <button type="button" class="hud__circle" data-hud-toggle aria-label={t.pause} data-pause={t.pause} data-play={t.play}>
+    <span class="hud__icon" data-icon-pause set:html={pause} />
+    <span class="hud__icon" data-icon-play hidden set:html={play} />
+  </button>
+  <button type="button" class="hud__skip" data-hud-skip>{t.skip}</button>
+</div>
+
+<button type="button" class="hud-replay" data-hud-replay aria-label={t.replay} title={t.replay}>
+  <span class="hud__icon" set:html={replay} />
+</button>
+</aside>
+
+<script>
+  // El motor solo se descarga si hay build: la visita repetida no paga estos KB.
+  const root = document.documentElement;
+  const hud = document.querySelector<HTMLElement>('[data-hud]');
+  if (root.dataset.build === 'pending' && hud) {
+    import('../../build-engine/run').then((engine) => engine.start());
+  }
+
+  document.querySelector('[data-hud-replay]')?.addEventListener('click', () => {
+    try {
+      sessionStorage.setItem('rp-replay', '1');
+    } catch {
+      // Sin almacenamiento, ?build=1 fuerza el build igual.
+    }
+    scrollTo(0, 0);
+    const url = new URL(location.href);
+    url.searchParams.set('build', '1');
+    location.href = url.toString();
+  });
+</script>
+
+<style is:global>
+  .hud {
+    position: fixed;
+    left: 50%;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    z-index: 50;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 24px);
+    transform: translateX(-50%);
+  }
+
+  [data-build='pending'] .hud,
+  [data-build='running'] .hud,
+  .hud[data-state='done'] {
+    display: flex;
+  }
+
+  .hud__pill,
+  .hud__circle,
+  .hud__skip,
+  .hud-replay {
+    border: 1px solid rgb(245 242 244 / 0.08);
+    background: rgb(24 19 23 / 0.82);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    color: var(--color-text);
+  }
+
+  .hud__pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 980px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .hud__dots {
+    display: flex;
+  }
+
+  .hud__dots i {
+    width: 8px;
+    height: 8px;
+    margin-left: -2px;
+    border-radius: 50%;
+    border: 1px solid rgb(11 7 10 / 0.9);
+  }
+
+  .hud__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud__track {
+    display: block;
+    width: 56px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 980px;
+    background: rgb(245 242 244 / 0.16);
+  }
+
+  .hud__fill {
+    display: block;
+    height: 100%;
+    background: var(--color-text);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .hud__circle {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.32s var(--ease-apple);
+  }
+
+  .hud__skip {
+    flex: none;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 980px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.32s var(--ease-apple);
+  }
+
+  .hud__circle:hover,
+  .hud__skip:hover,
+  .hud-replay:hover {
+    background: rgb(113 75 103 / 0.9);
+  }
+
+  .hud__circle:active,
+  .hud__skip:active,
+  .hud-replay:active {
+    transform: scale(0.96);
+  }
+
+  .hud__icon {
+    display: grid;
+    place-items: center;
+  }
+
+  .hud__icon[hidden] {
+    display: none;
+  }
+
+  .hud__icon svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+
+  .hud[data-state='done'] .hud__circle,
+  .hud[data-state='done'] .hud__skip,
+  .hud[data-state='done'] .hud__track {
+    display: none;
+  }
+
+  .hud-replay {
+    position: fixed;
+    right: 18px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    z-index: 50;
+    display: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    opacity: 0.7;
+    cursor: pointer;
+    transition:
+      opacity 0.32s var(--ease-apple),
+      background-color 0.32s var(--ease-apple);
+  }
+
+  .hud-replay:hover,
+  .hud-replay:focus-visible {
+    opacity: 1;
+  }
+
+  /* El JS es necesario para reconstruir: sin JS el botón no aparece. */
+  [data-build='done'] .hud-replay,
+  [data-js] .hud-replay {
+    display: grid;
+  }
+
+  [data-build='pending'] .hud-replay,
+  [data-build='running'] .hud-replay {
+    display: none;
+  }
+
+  @media (max-width: 480px) {
+    .hud__track,
+    .hud__dots {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hud-replay {
+      display: none !important;
+    }
+  }
+</style>

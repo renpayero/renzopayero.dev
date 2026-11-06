@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0b070a;
+  --color-surface: #181317;
+  --color-text: #f5f2f4;
+  /* Oficiales de Odoo. #714B67 da 2.8:1 sobre --bg: solo rellenos y halos, nunca texto. */
+  --color-odoo: #714b67;
+  --color-gris: #8f8f8f;
+  /* Solo existen durante el build, en los cursores de los agentes. */
+  --color-coral: #e46e78;
+  --color-dorado: #e4a900;
+  --color-ciruela-claro: #d08bbd;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-geist), ui-monospace, monospace;
+
+  --radius-tile: 28px;
+
+  /* Medidos en Apple: docs/referencia-apple.md */
+  --ease-apple: cubic-bezier(0.4, 0, 0.6, 1);
+  --ease-entrada: cubic-bezier(0.28, 0.11, 0.32, 1);
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-text);
+    color-scheme: dark;
+    font-family: var(--font-sans);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-size: 1.0625rem;
+    line-height: 1.47;
+    overflow-x: clip;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-text);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.astro/
+.env*
+*.log
+.DS_Store
+
+# Fuentes privadas: los CV exponen el teléfono
+_fuentes/
+
+# Skills de terceros instaladas en el proyecto; ver docs/skills.md
+.claude/skills/
+
+# Salidas de pruebas
+test-results/
+playwright-report/

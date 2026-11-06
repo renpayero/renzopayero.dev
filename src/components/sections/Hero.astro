@@ -1,0 +1,374 @@
+---
+import { Picture } from 'astro:assets';
+import retrato from '../../assets/retrato.webp';
+import name from '../../generated/hero-name.json';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+---
+<header class="topbar" data-b="nav">
+  <a class="topbar__brand" href={lang === 'es' ? '/' : '/en/'}>Renzo Payero</a>
+  <nav class="topbar__nav" aria-label={t.nav.label}>
+    <a href="#proyectos">{t.nav.projects}</a>
+    <a href="#experiencia">{t.nav.experience}</a>
+    <a class="topbar__cta" href="#contacto">{t.nav.contact}</a>
+  </nav>
+</header>
+
+<section class="hero" data-section="hero">
+  <div class="hero__ambient" data-ambient aria-hidden="true"></div>
+  <div class="hero__grid">
+    <div class="hero__copy">
+      <h1 class="name" data-b="name" aria-label="Renzo Payero">
+        {
+          name.words.map((word) => (
+            <span class="name__word" data-word aria-hidden="true">
+              <span class="name__halo">{word.text}</span>
+              <span class="name__halo name__halo--near">{word.text}</span>
+              <span class="name__off">{word.text}</span>
+              <svg
+                class="name__trace"
+                viewBox={`0 ${-name.baseline} ${word.advance} ${name.lineBox}`}
+                preserveAspectRatio="none"
+                data-advance={word.advance}
+                data-baseline={name.baseline}
+                data-linebox={name.lineBox}
+              >
+                {word.glyphs.map((glyph) =>
+                  glyph.contours.map((d) => <path class="name__stroke" d={d} pathLength="1" />),
+                )}
+                {word.glyphs.map((glyph) => <path class="name__cover" d={glyph.d} />)}
+              </svg>
+              <span class="name__lit">{word.text}</span>
+            </span>
+          ))
+        }
+      </h1>
+      <p class="lede" data-b="lede">
+        <span>{t.hero.role}</span>{' '}<span class="lede__soft">{t.hero.focus}</span>
+      </p>
+      <div class="cta" data-b="cta">
+        <a class="btn btn--primary" href="#proyectos">{t.hero.seeProjects}</a>
+        <a class="btn" href="#contacto">{t.hero.talk}</a>
+      </div>
+    </div>
+    <figure class="portrait" data-b="portrait">
+      <span class="portrait__fill" data-portrait-fill aria-hidden="true"></span>
+      <Picture
+        src={retrato}
+        alt={t.hero.portraitAlt}
+        formats={['avif', 'webp']}
+        widths={[420, 640, 900]}
+        sizes="(max-width: 767px) 90vw, 36vw"
+        loading="eager"
+        fetchpriority="high"
+      />
+    </figure>
+  </div>
+</section>
+
+<style is:global>
+  .topbar {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1260px;
+    height: 64px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .topbar__brand {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .topbar__nav {
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 2.4vw, 28px);
+    font-size: 0.8125rem;
+    color: var(--color-gris);
+  }
+
+  .topbar__nav a {
+    transition: color 0.32s var(--ease-apple);
+  }
+
+  .topbar__nav a:hover {
+    color: var(--color-text);
+  }
+
+  .topbar .topbar__cta {
+    padding: 7px 14px;
+    border-radius: 980px;
+    background: var(--color-odoo);
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  @media (max-width: 559px) {
+    .topbar__nav a:not(.topbar__cta) {
+      display: none;
+    }
+  }
+
+  .hero {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    min-height: 100dvh;
+    padding: 80px clamp(16px, 3vw, 24px) 88px;
+    overflow: clip;
+  }
+
+  .hero__ambient {
+    position: absolute;
+    inset: -10% -10% auto auto;
+    z-index: -1;
+    width: min(1100px, 110vw);
+    aspect-ratio: 1;
+    background: radial-gradient(closest-side, rgb(113 75 103 / 0.42), rgb(113 75 103 / 0.12) 55%, transparent);
+    pointer-events: none;
+  }
+
+  .hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: center;
+    gap: clamp(24px, 4vw, 56px);
+    width: 100%;
+    max-width: 1260px;
+    margin-inline: auto;
+  }
+
+  .name {
+    --name-size: clamp(4rem, min(13.2vw, 25svh), 14rem);
+    position: relative;
+    font-size: var(--name-size);
+    font-weight: 700;
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    font-variation-settings: 'opsz' 32;
+  }
+
+  .name__word {
+    position: relative;
+    display: block;
+    width: max-content;
+  }
+
+  .name__word > * {
+    display: block;
+  }
+
+  .name__lit {
+    position: relative;
+    color: var(--color-odoo);
+    -webkit-text-stroke: 0.028em var(--color-text);
+    paint-order: stroke fill;
+  }
+
+  .name__off {
+    position: absolute;
+    inset: 0;
+    color: var(--color-surface);
+    -webkit-text-stroke: 0.014em var(--color-gris);
+    paint-order: stroke fill;
+    opacity: 0;
+  }
+
+  .name__halo {
+    position: absolute;
+    inset: 0;
+    color: var(--color-odoo);
+    -webkit-text-stroke: 0.14em var(--color-odoo);
+    filter: blur(0.2em);
+  }
+
+  .name__halo--near {
+    -webkit-text-stroke: 0.07em var(--color-odoo);
+    filter: blur(0.05em);
+  }
+
+  .name__trace {
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .name__stroke {
+    fill: none;
+    stroke: var(--color-text);
+    stroke-width: 50;
+    stroke-linejoin: round;
+    stroke-dasharray: 1 1;
+    stroke-dashoffset: 1;
+  }
+
+  .name__cover {
+    fill: var(--color-surface);
+  }
+
+  [data-neon='c'] .name__lit {
+    color: var(--color-text);
+    -webkit-text-stroke: 0;
+  }
+
+  .lede {
+    max-width: 30ch;
+    margin-top: clamp(28px, 5svh, 48px);
+    font-size: clamp(1.3125rem, 2vw, 1.75rem);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+  }
+
+  .lede__soft {
+    color: var(--color-gris);
+  }
+
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: clamp(20px, 3.4svh, 36px);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding-inline: 20px;
+    border: 1px solid rgb(245 242 244 / 0.24);
+    border-radius: 980px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      background-color 0.32s var(--ease-apple),
+      border-color 0.32s var(--ease-apple),
+      transform 0.16s var(--ease-apple);
+  }
+
+  .btn:hover {
+    border-color: var(--color-text);
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn--primary {
+    border-color: transparent;
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+
+  .btn--primary:hover {
+    border-color: transparent;
+    background: #fff;
+  }
+
+  .portrait {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+    aspect-ratio: 1024 / 1240;
+    max-height: calc(100dvh - 176px);
+    justify-self: end;
+    width: 100%;
+    max-width: min(460px, 100%);
+  }
+
+  .portrait__fill {
+    position: absolute;
+    inset: 0;
+    background: var(--color-odoo);
+    transform-origin: bottom;
+  }
+
+  .portrait img {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 0;
+  }
+
+  @media (max-width: 767px) {
+    .hero {
+      align-items: flex-start;
+      padding-top: 84px;
+    }
+
+    .hero__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .name {
+      --name-size: min(27vw, 17svh);
+    }
+
+    .portrait {
+      justify-self: stretch;
+      max-width: none;
+      max-height: 60svh;
+    }
+  }
+
+  /* Estado durante el build. Sin JS nada de esto aplica y se ve el estado final. */
+  [data-build='pending'] .name__off,
+  [data-build='running'] .name__off {
+    opacity: 1;
+  }
+
+  /* 0.001 y no 0: se pintan desde el inicio y al encenderse no cuentan como un LCP nuevo. */
+  [data-build='pending'] .name__lit,
+  [data-build='pending'] .name__halo,
+  [data-build='running'] .name__lit,
+  [data-build='running'] .name__halo {
+    opacity: 0.001;
+    will-change: opacity;
+  }
+
+  [data-build='pending'] .hero__ambient,
+  [data-build='running'] .hero__ambient {
+    opacity: 0;
+    will-change: opacity;
+  }
+
+  [data-build='running'] .name__trace {
+    display: block;
+  }
+
+  [data-build='pending'] [data-b='nav'],
+  [data-build='pending'] [data-b='lede'],
+  [data-build='pending'] [data-b='cta'] {
+    opacity: 0;
+  }
+
+  /* El retrato también arranca apagado pero visible: es el LCP en móvil. */
+  [data-build='pending'] .portrait img {
+    opacity: 0.14;
+  }
+
+  [data-build='pending'] .portrait__fill {
+    transform: scaleY(0);
+  }
+</style>
