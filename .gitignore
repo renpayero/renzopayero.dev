@@ -20,3 +20,6 @@ playwright-report/
 
 # Cuadros temporales de grabación
 .cache/
+
+# Notas internas de trabajo.
+tasks/
