@@ -2,7 +2,8 @@ import type { RoleId } from '../i18n/ui';
 
 export type AgentMode = 'orbit' | 'task' | 'pin';
 
-export const TRAIL = 10;
+export const TRAIL = 14;
+const TETHER_LIFE = 0.5;
 
 /** Agente en coordenadas de documento. En órbita lo mueve la física; en tarea, el timeline. */
 export interface Agent {
@@ -68,6 +69,12 @@ export interface Ripple {
   age: number;
 }
 
+/** Línea de despacho: el cursor es el orquestador y cada agente sale con una orden. */
+export interface Tether {
+  agent: Agent;
+  age: number;
+}
+
 const LINE = '208, 139, 189'; // ciruela claro: el color de las herramientas, nunca de la página
 const CHIP = '#714b67';
 const INK = '#f5f2f4';
@@ -82,6 +89,7 @@ export class Overlay {
   readonly guides: Guide[] = [];
   readonly notes: Note[] = [];
   readonly ripples: Ripple[] = [];
+  readonly tethers: Tether[] = [];
 
   private readonly canvas = document.createElement('canvas');
   private readonly ctx: CanvasRenderingContext2D;
@@ -143,11 +151,49 @@ export class Overlay {
     return canvas;
   }
 
-  render(agents: Agent[]): void {
+  /** La luz que acompaña al cursor: tiñe apenas lo que tiene cerca, con el ciruela de Odoo. */
+  private drawAura(x: number, y: number, strength: number): void {
+    if (strength <= 0.01) return;
+    const { ctx } = this;
+    const radius = 240;
+    const aura = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    aura.addColorStop(0, `rgba(113, 75, 103, ${0.42 * strength})`);
+    aura.addColorStop(0.45, `rgba(113, 75, 103, ${0.14 * strength})`);
+    aura.addColorStop(1, 'rgba(113, 75, 103, 0)');
+    ctx.fillStyle = aura;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  private drawTethers(x: number, y: number, scroll: number): void {
+    const { ctx } = this;
+    ctx.globalCompositeOperation = 'lighter';
+    for (const tether of this.tethers) {
+      const t = tether.age / TETHER_LIFE;
+      if (t >= 1) continue;
+      const { agent } = tether;
+      ctx.strokeStyle = agent.color;
+      ctx.globalAlpha = (1 - t) ** 2 * 0.75;
+      ctx.lineWidth = 1.4 * (1 - t) + 0.3;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(agent.x, agent.y - scroll);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  render(agents: Agent[], anchorX: number, anchorY: number, aura: number, dt: number): void {
     const { ctx } = this;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
     const scroll = scrollY;
+    this.drawAura(anchorX, anchorY, aura);
+    for (const tether of this.tethers) tether.age += dt;
+    while (this.tethers[0] && this.tethers[0].age >= TETHER_LIFE) this.tethers.shift();
+    this.drawTethers(anchorX, anchorY, scroll);
     for (const guide of this.guides) this.drawGuide(guide, scroll);
     for (const frame of this.frames) this.drawFrame(frame, scroll);
     for (const frame of this.hoverFrames) this.drawFrame(frame, scroll);
@@ -168,7 +214,7 @@ export class Overlay {
     ctx.strokeStyle = a.color;
     ctx.lineWidth = 1.1;
     ctx.lineCap = 'round';
-    ctx.globalAlpha = a.alpha * (0.22 + 0.16 * a.depth);
+    ctx.globalAlpha = a.alpha * (0.34 + 0.2 * a.depth);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y - scroll);
     for (let i = 0; i < TRAIL; i++) {

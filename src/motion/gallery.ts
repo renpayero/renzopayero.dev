@@ -2,6 +2,27 @@
 // la píldora muestra el progreso y al terminar pasa sola a la siguiente, salvo que se pause.
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// El momento dispositivo arranca una sola vez, al llegar al 70% de la pantalla, y queda en su último cuadro.
+const stage = document.querySelector<HTMLElement>('[data-device]');
+const deviceVideo = stage?.querySelector('video');
+if (stage && deviceVideo) {
+  if (reduced) {
+    deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
+  } else {
+    new IntersectionObserver(
+      ([entry], observer) => {
+        if (!entry?.isIntersecting) return;
+        observer.disconnect();
+        deviceVideo.preload = 'auto';
+        void deviceVideo.play().catch(() => {
+          deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
+        });
+      },
+      { rootMargin: '0px 0px -30% 0px' },
+    ).observe(stage);
+  }
+}
+
 for (const gallery of document.querySelectorAll<HTMLElement>('[data-gallery]')) {
   const track = gallery.querySelector<HTMLElement>('[data-gallery-track]');
   const tiles = [...gallery.querySelectorAll<HTMLElement>('[data-tile]')];

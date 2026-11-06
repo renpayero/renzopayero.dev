@@ -1,0 +1,29 @@
+---
+import LocalNav from './LocalNav.astro';
+import Capabilities from './sections/Capabilities.astro';
+import Contact from './sections/Contact.astro';
+import Experience from './sections/Experience.astro';
+import Hero from './sections/Hero.astro';
+import HowBuilt from './sections/HowBuilt.astro';
+import Manifesto from './sections/Manifesto.astro';
+import Projects from './sections/Projects.astro';
+import System from './sections/System.astro';
+import type { Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+---
+<LocalNav lang={lang} />
+<main id="main">
+  <Hero lang={lang} />
+  <Manifesto lang={lang} />
+  <System lang={lang} />
+  <Projects lang={lang} />
+  <Experience lang={lang} />
+  <Capabilities lang={lang} />
+  <HowBuilt lang={lang} />
+  <Contact lang={lang} />
+</main>

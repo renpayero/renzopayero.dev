@@ -21,9 +21,9 @@ const CREW: Record<'desktop' | 'mobile', Record<RoleId, number>> = {
  * los agentes se cruzan por delante y por detrás del cursor sin repetir nunca el mismo dibujo.
  */
 const SHELLS = [
-  { radius: 40, speed: 1.55, tilt: 1.02, spin: -0.5 },
-  { radius: 66, speed: -1.08, tilt: 1.2, spin: 0.62 },
-  { radius: 94, speed: 0.76, tilt: 1.28, spin: 1.45 },
+  { radius: 46, speed: 1.6, tilt: 0.86, spin: -0.5 },
+  { radius: 76, speed: -1.12, tilt: 1.0, spin: 0.62 },
+  { radius: 108, speed: 0.8, tilt: 1.1, spin: 1.45 },
 ];
 
 const TIP_HEADING = -2.09; // la flecha apunta arriba a la izquierda
@@ -67,6 +67,7 @@ export class Swarm {
   private lastFrame = 0;
   private lastMove = 0;
   private energy = 0;
+  private aura = 0;
   private time = 0;
   private running = false;
   private busy = 0;
@@ -134,6 +135,7 @@ export class Swarm {
   /** El motor pide un agente: se despega de la órbita y el timeline pasa a moverlo. */
   borrow(agent: Agent): void {
     if (agent.mode === 'pin') this.endInspection();
+    if (agent.mode !== 'task') this.overlay.tethers.push({ agent, age: 0 });
     agent.mode = 'task';
   }
 
@@ -290,7 +292,8 @@ export class Swarm {
     this.lastFrame = now;
     this.time += dt;
     this.update(dt, now);
-    this.overlay.render(this.agents);
+    this.aura += ((this.hasPointer && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
+    this.overlay.render(this.agents, this.pointerX, this.pointerY, this.aura * (0.8 + this.energy * 0.4), dt);
     requestAnimationFrame(this.tick);
   };
 

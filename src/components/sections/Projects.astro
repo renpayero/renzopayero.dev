@@ -2,6 +2,8 @@
 import { getImage } from 'astro:assets';
 import pause from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
 import play from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
+import deviceFinal from '../../assets/projects/device-final.webp';
+import deviceStart from '../../assets/projects/device-start.webp';
 import { posters } from '../../lib/project-media';
 import { projects, projectUi } from '../../i18n/projects';
 import type { Lang } from '../../i18n/ui';
@@ -14,6 +16,9 @@ const { lang } = Astro.props;
 const t = projectUi[lang];
 const list = projects[lang];
 const base = lang === 'es' ? '' : '/en';
+const lead = list[0];
+const startFrame = (await getImage({ src: deviceStart, width: 1080, format: 'webp', quality: 80 })).src;
+const finalFrame = (await getImage({ src: deviceFinal, width: 1080, format: 'webp', quality: 80 })).src;
 const tiles = await Promise.all(
   list.map(async (project) => ({
     project,
@@ -25,6 +30,22 @@ const tiles = await Promise.all(
   <div class="wrap">
     <h2 class="h2" data-type data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
   </div>
+
+  {
+    lead && (
+      <div class="wrap device">
+        <figure class="device__stage" data-device data-frame data-final={finalFrame}>
+          <video src="/video/device-legacy.mp4" poster={startFrame} muted playsinline preload="none" width="1080" height="1080" aria-hidden="true" />
+        </figure>
+        <div class="device__copy">
+          <p class="device__name reveal">{lead.name}</p>
+          <h3 class="device__title reveal" data-frame>{lead.tagline}<br /><span class="tone">{lead.tone}</span></h3>
+          <p class="body-l device__text reveal">{lead.summary}</p>
+          <a class="btn btn--primary reveal" href={`${base}/proyectos/${lead.slug}/`} aria-label={`${t.open}: ${lead.name}`}>{t.open}</a>
+        </div>
+      </div>
+    )
+  }
 
   <div class="gallery" data-gallery role="group" aria-label={t.gallery}>
     <ul class="gallery__track" data-gallery-track tabindex="0">
@@ -77,6 +98,54 @@ const tiles = await Promise.all(
 </script>
 
 <style is:global>
+  .device {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    align-items: center;
+    gap: clamp(16px, 4vw, 64px);
+    margin-top: clamp(16px, 3vw, 40px);
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .device__stage {
+    width: min(100%, 86svh);
+    margin-inline: auto;
+    /* El fondo del video se funde con la página: sin borde visible entre los dos. */
+    mask-image: radial-gradient(closest-side, #000 76%, transparent);
+    -webkit-mask-image: radial-gradient(closest-side, #000 76%, transparent);
+  }
+
+  .device__stage video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .device__name {
+    color: var(--color-gris);
+    font-size: clamp(1.0625rem, 1.5vw, 1.3125rem);
+    font-weight: 500;
+  }
+
+  .device__title {
+    margin-top: 8px;
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+  }
+
+  .device__text {
+    margin-block: 18px 24px;
+  }
+
+  @media (max-width: 767px) {
+    .device {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .projects {
     padding-inline: 0;
     overflow-x: clip;
@@ -91,7 +160,7 @@ const tiles = await Promise.all(
   }
 
   .gallery__track {
-    --tile-w: min(1260px, calc(100vw - 2 * clamp(16px, 3vw, 24px)));
+    --tile-w: min(1260px, calc(100vw - 2 * clamp(16px, 3vw, 24px)), calc(74svh * 16 / 9));
     display: flex;
     gap: 16px;
     padding-inline: calc((100vw - var(--tile-w)) / 2);

@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base lang="es" title="Página no encontrada. Renzo Payero" description="Esta página no existe." build={false} path={null}>
+  <main id="main" class="not-found">
+    <h1 class="h2">Los agentes buscaron por todos lados.<br /><span class="tone">Esta página no existe.</span></h1>
+    <a class="btn btn--primary not-found__cta" href="/">Volver al inicio</a>
+  </main>
+</Base>
+
+<style is:global>
+  .not-found {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    max-width: 1260px;
+    min-height: 100dvh;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .not-found__cta {
+    margin-top: 28px;
+  }
+</style>

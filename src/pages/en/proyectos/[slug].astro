@@ -1,0 +1,16 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ProjectCase from '../../../components/ProjectCase.astro';
+import { projects, type Slug } from '../../../i18n/projects';
+
+export function getStaticPaths() {
+  return projects.en.map((project) => ({ params: { slug: project.slug }, props: { project } }));
+}
+
+const { project } = Astro.props;
+---
+<Base lang="en" title={`${project.name}. Renzo Payero`} description={project.summary} build={false} path={`/proyectos/${project.slug}/`} og={project.slug}>
+  <main id="main">
+    <ProjectCase lang="en" slug={project.slug as Slug} />
+  </main>
+</Base>

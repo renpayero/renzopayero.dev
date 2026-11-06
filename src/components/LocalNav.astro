@@ -1,0 +1,103 @@
+---
+import { ui, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+---
+<nav class="localnav" aria-label={t.nav.label}>
+  <a class="localnav__brand" href={lang === 'es' ? '/' : '/en/'}>Renzo Payero</a>
+  <div class="localnav__links">
+    <a href="#proyectos">{t.nav.projects}</a>
+    <a href="#experiencia">{t.nav.experience}</a>
+    <a class="localnav__cta" href="#contacto">{t.nav.contact}</a>
+  </div>
+</nav>
+
+<style is:global>
+  /* La barra de producto de Apple: aparece al dejar el hero, con CSS y sin un solo listener. */
+  .localnav {
+    display: none;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .localnav {
+        position: fixed;
+        top: 8px;
+        left: 50%;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        width: min(838px, calc(100vw - 16px));
+        height: 48px;
+        padding: 0 8px 0 18px;
+        border: 1px solid rgb(245 242 244 / 0.08);
+        border-radius: 980px;
+        background: rgb(24 19 23 / 0.78);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        translate: -50% 0;
+        animation: localnav-in linear both;
+        animation-timeline: scroll(root block);
+        animation-range: 90vh 104vh;
+      }
+
+      @keyframes localnav-in {
+        from {
+          opacity: 0;
+          visibility: hidden;
+          transform: translateY(-12px);
+        }
+        to {
+          opacity: 1;
+          visibility: visible;
+          transform: none;
+        }
+      }
+    }
+  }
+
+  .localnav__brand {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .localnav__links {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 2vw, 22px);
+    color: var(--color-gris);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  .localnav__links a {
+    transition: color 0.32s var(--ease-apple);
+  }
+
+  .localnav__links a:hover {
+    color: var(--color-text);
+  }
+
+  .localnav .localnav__cta {
+    padding: 7px 14px;
+    border-radius: 980px;
+    background: var(--color-odoo);
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  @media (max-width: 559px) {
+    .localnav__links a:not(.localnav__cta) {
+      display: none;
+    }
+  }
+</style>

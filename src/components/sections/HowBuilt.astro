@@ -1,0 +1,94 @@
+---
+import { howBuilt } from '../../i18n/how-built';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const t = howBuilt[Astro.props.lang];
+---
+<section class="section how" data-section="como">
+  <div class="wrap how__layout">
+    <div>
+      <h2 class="h2" data-type data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
+      <p class="body-l how__text reveal" data-frame>{t.text}</p>
+      <button type="button" class="btn btn--primary how__cta reveal" data-autopilot data-js-only>{t.watch}</button>
+    </div>
+    <dl class="how__stats reveal" data-frame data-telemetry>
+      {
+        t.metrics.map((metric) => (
+          <div class="how__stat" data-metric={metric.id} hidden>
+            <dd class="how__value" data-value></dd>
+            <dt class="how__label">{metric.label}</dt>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>
+
+<script>
+  import '../../motion/telemetry';
+</script>
+
+<style is:global>
+  .how__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    align-items: start;
+    gap: clamp(32px, 5vw, 80px);
+  }
+
+  .how__text {
+    margin-top: 20px;
+  }
+
+  .how__cta {
+    margin-top: 28px;
+    cursor: pointer;
+  }
+
+  html:not([data-js]) [data-js-only] {
+    display: none;
+  }
+
+  .how__stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .how__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: clamp(18px, 2.2vw, 28px);
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+  }
+
+  .how__stat[hidden] {
+    display: none;
+  }
+
+  .how__value {
+    font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .how__label {
+    color: var(--color-gris);
+    font-size: 0.9375rem;
+    line-height: 1.28;
+  }
+
+  @media (max-width: 899px) {
+    .how__layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

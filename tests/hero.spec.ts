@@ -270,7 +270,7 @@ test.describe('enjambre', () => {
     for (const agent of agents) {
       const distance = Math.hypot(agent.x - x, agent.y - scroll - y);
       expect(agent.mode).toBe('orbit');
-      expect(distance).toBeLessThan(190);
+      expect(distance).toBeLessThan(230);
       expect(agent.alpha).toBeGreaterThan(0.5);
     }
     // Se mueven de verdad: siguen orbitando sin que el cursor se mueva.
@@ -290,7 +290,7 @@ test.describe('enjambre', () => {
     await page.mouse.move(x, y, { steps: 6 });
     await page.waitForTimeout(1200);
     const { agents, scroll } = await read(page);
-    for (const agent of agents) expect(Math.hypot(agent.x - x, agent.y - scroll - y)).toBeLessThan(190);
+    for (const agent of agents) expect(Math.hypot(agent.x - x, agent.y - scroll - y)).toBeLessThan(230);
   });
 
   test('salen a construir y después vuelven a la órbita', async ({ page }) => {
@@ -306,7 +306,7 @@ test.describe('enjambre', () => {
     const { agents, scroll } = await read(page);
     for (const agent of agents) {
       expect(agent.mode).toBe('orbit');
-      expect(Math.hypot(agent.x - 302, agent.y - scroll - 302)).toBeLessThan(190);
+      expect(Math.hypot(agent.x - 302, agent.y - scroll - 302)).toBeLessThan(230);
     }
   });
 
