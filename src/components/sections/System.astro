@@ -72,8 +72,8 @@ const links = c.links.map((label, i) => {
           {
             c.stats.map((s, i) => (
               <div class="system__stat" style={`--s:${74 + i * 6}`}>
-                <dd class="system__value">{s.value}</dd>
                 <dt class="system__label">{s.label}</dt>
+                <dd class="system__value">{s.value}</dd>
               </div>
             ))
           }
@@ -197,7 +197,8 @@ const links = c.links.map((label, i) => {
 
   .system__stat {
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
   }
 
   .system__value {

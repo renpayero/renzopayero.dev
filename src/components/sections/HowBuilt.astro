@@ -19,8 +19,8 @@ const t = howBuilt[Astro.props.lang];
       {
         t.metrics.map((metric) => (
           <div class="how__stat" data-metric={metric.id} hidden>
-            <dd class="how__value" data-value></dd>
             <dt class="how__label">{metric.label}</dt>
+            <dd class="how__value" data-value></dd>
           </div>
         ))
       }
@@ -67,7 +67,8 @@ const t = howBuilt[Astro.props.lang];
 
   .how__stat {
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
     gap: 6px;
     padding: clamp(18px, 2.2vw, 28px);
     border-radius: var(--radius-tile);
