@@ -6,10 +6,16 @@ import { ui, type Lang } from '../i18n/ui';
 
 interface Props {
   lang: Lang;
+  title?: string;
+  description?: string;
+  /** Solo la home se construye: en una página interna el visitante viene a leer. */
+  build?: boolean;
 }
 
-const { lang } = Astro.props;
+const { lang, build = true } = Astro.props;
 const t = ui[lang];
+const title = Astro.props.title ?? t.meta.title;
+const description = Astro.props.description ?? t.meta.description;
 ---
 <!doctype html>
 <html lang={lang}>
@@ -17,18 +23,19 @@ const t = ui[lang];
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b070a" />
-    <title>{t.meta.title}</title>
-    <meta name="description" content={t.meta.description} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
     <Font cssVariable="--font-inter" preload />
     <Font cssVariable="--font-geist" />
     <!--
       Decide antes del primer pintado si corre el build. Sin JS o con reduced motion
       la página llega en su estado final. Si el motor no carga, el watchdog la libera.
     -->
-    <script is:inline>
+    <script is:inline define:vars={{ build }}>
       (function () {
         var root = document.documentElement;
         root.dataset.js = '';
+        if (!build) return;
         var params = new URLSearchParams(location.search);
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         if (params.get('build') === '0') return;
@@ -57,11 +64,34 @@ const t = ui[lang];
     <slot />
     <script>
       import '../motion/reveal';
+      import '../swarm/boot';
     </script>
   </body>
 </html>
 
 <style is:global>
+  /* Transición nativa entre páginas: el video del proyecto viaja de la galería al caso. */
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.32s;
+    animation-timing-function: var(--ease-apple);
+  }
+
+  ::view-transition-group(*) {
+    animation-duration: 0.5s;
+    animation-timing-function: var(--ease-entrada);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @view-transition {
+      navigation: none;
+    }
+  }
+
   .skip-link {
     position: fixed;
     top: 12px;

@@ -1,0 +1,252 @@
+---
+import { getImage } from 'astro:assets';
+import pause from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
+import play from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
+import { posters } from '../../lib/project-media';
+import { projects, projectUi } from '../../i18n/projects';
+import type { Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = projectUi[lang];
+const list = projects[lang];
+const base = lang === 'es' ? '' : '/en';
+const tiles = await Promise.all(
+  list.map(async (project) => ({
+    project,
+    poster: (await getImage({ src: posters[project.slug], width: 1280, format: 'webp', quality: 78 })).src,
+  })),
+);
+---
+<section id="proyectos" class="section projects" data-section="proyectos">
+  <div class="wrap">
+    <h2 class="h2" data-type data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
+  </div>
+
+  <div class="gallery" data-gallery role="group" aria-label={t.gallery}>
+    <ul class="gallery__track" data-gallery-track tabindex="0">
+      {
+        tiles.map(({ project, poster }) => (
+          <li class="tile reveal" data-tile data-frame style={`--reveal-y:32px;view-transition-name:media-${project.slug}`}>
+            <video
+              class="tile__video"
+              src={`/video/${project.slug}.mp4`}
+              poster={poster}
+              muted
+              playsinline
+              preload="none"
+              width="1280"
+              height="720"
+              aria-hidden="true"
+            />
+            <div class="tile__shade" aria-hidden="true" />
+            <div class="tile__copy">
+              {project.demo && <p class="tile__badge">{t.demo}</p>}
+              <h3 class="tile__name">{project.name}</h3>
+              <p class="tile__line">{project.tagline} <span class="tone-light">{project.tone}</span></p>
+              <a class="btn btn--primary tile__cta" href={`${base}/proyectos/${project.slug}/`} aria-label={`${t.open}: ${project.name}`}>{t.open}</a>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="gallery__controls">
+      <div class="gallery__dots">
+        {
+          list.map((project, i) => (
+            <button type="button" class:list={['gallery__dot', { 'is-active': i === 0 }]} data-dot aria-label={t.goTo(project.name)}>
+              <span />
+            </button>
+          ))
+        }
+      </div>
+      <button type="button" class="hud__circle gallery__toggle" data-gallery-toggle aria-label={t.pause} data-pause={t.pause} data-play={t.play}>
+        <span class="hud__icon" data-icon-pause set:html={pause} />
+        <span class="hud__icon" data-icon-play hidden set:html={play} />
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../motion/gallery';
+</script>
+
+<style is:global>
+  .projects {
+    padding-inline: 0;
+    overflow-x: clip;
+  }
+
+  .projects > .wrap {
+    padding-inline: clamp(16px, 3vw, 24px);
+  }
+
+  .gallery {
+    margin-top: clamp(32px, 5vw, 64px);
+  }
+
+  .gallery__track {
+    --tile-w: min(1260px, calc(100vw - 2 * clamp(16px, 3vw, 24px)));
+    display: flex;
+    gap: 16px;
+    padding-inline: calc((100vw - var(--tile-w)) / 2);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: calc((100vw - var(--tile-w)) / 2);
+    list-style: none;
+    scrollbar-width: none;
+  }
+
+  .gallery__track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gallery__track:focus-visible {
+    outline-offset: -4px;
+  }
+
+  .tile {
+    position: relative;
+    flex: none;
+    width: var(--tile-w);
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+
+  .tile__video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  .tile__shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgb(11 7 10 / 0.92), rgb(11 7 10 / 0.5) 34%, transparent 62%);
+    pointer-events: none;
+  }
+
+  .tile__copy {
+    position: absolute;
+    inset: auto 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: clamp(18px, 3.4vw, 44px);
+  }
+
+  .tile__badge {
+    padding: 4px 10px;
+    border-radius: 980px;
+    background: var(--color-odoo);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .tile__name {
+    font-size: clamp(1.625rem, 3.6vw, 2.75rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+  }
+
+  .tile__line {
+    max-width: 44ch;
+    font-size: clamp(0.9375rem, 1.5vw, 1.3125rem);
+    line-height: 1.25;
+  }
+
+  .tone-light {
+    color: rgb(245 242 244 / 0.66);
+  }
+
+  .tile__cta {
+    margin-top: 10px;
+  }
+
+  .gallery__controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .gallery__dots {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 44px;
+    padding-inline: 12px;
+    border-radius: 980px;
+    background: var(--color-surface);
+  }
+
+  .gallery__dot {
+    display: grid;
+    place-items: center;
+    height: 44px;
+    padding-inline: 5px;
+    cursor: pointer;
+  }
+
+  .gallery__dot span {
+    position: relative;
+    display: block;
+    width: 8px;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 980px;
+    background: rgb(245 242 244 / 0.34);
+    transition: width 0.32s var(--ease-apple);
+  }
+
+  .gallery__dot.is-active span {
+    width: 40px;
+  }
+
+  .gallery__dot.is-active span::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--color-text);
+    transform: scaleX(var(--p, 0));
+    transform-origin: left;
+  }
+
+  .gallery__toggle {
+    background: var(--color-surface);
+  }
+
+  @media (max-width: 767px) {
+    .tile {
+      aspect-ratio: 4 / 5;
+    }
+
+    .tile__shade {
+      background: linear-gradient(to top, rgb(11 7 10 / 0.96), rgb(11 7 10 / 0.7) 48%, transparent 76%);
+    }
+
+    .tile__video {
+      object-position: left top;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gallery__toggle {
+      display: none;
+    }
+  }
+</style>

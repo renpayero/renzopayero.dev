@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
-const HIDE_TOOLS = '.hud, .hud-replay { display: none !important; }';
+const HIDE_TOOLS = '.hud, .hud-replay, canvas { display: none !important; }';
 
 const state = (page: Page) => page.evaluate(() => document.documentElement.dataset.build ?? null);
 const waitDone = (page: Page, timeout = 8000) =>
@@ -200,7 +200,6 @@ test.describe('secciones', () => {
     }
     await waitDone(page);
     await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
-    await expect(page.locator('canvas')).toHaveCount(0);
     expect(await allTyped(page)).toBe(true);
   });
 
@@ -223,7 +222,6 @@ test.describe('secciones', () => {
     expect(await allTyped(page)).toBe(true);
     const hidden = await page.evaluate(() => document.querySelectorAll('.reveal:not(.is-in)').length);
     expect(hidden).toBe(0);
-    await expect(page.locator('canvas')).toHaveCount(0);
   });
 
   test('sin JS y con reduced motion se lee todo sin animar', async ({ browser, baseURL }) => {
@@ -246,6 +244,92 @@ test.describe('secciones', () => {
       expect(res.status()).toBe(200);
       expect(res.headers()['content-type']).toContain('pdf');
     }
+  });
+});
+
+test.describe('enjambre', () => {
+  interface SwarmView {
+    agents: Array<{ x: number; y: number; mode: string; alpha: number }>;
+  }
+  const read = (page: Page) =>
+    page.evaluate(() => {
+      const swarm = (window as unknown as { __rpSwarm?: SwarmView }).__rpSwarm;
+      return { scroll: scrollY, agents: swarm?.agents.map((a) => ({ x: a.x, y: a.y, mode: a.mode, alpha: a.alpha })) ?? [] };
+    });
+
+  test('los agentes orbitan el cursor, también en una visita repetida', async ({ page, isMobile, viewport }) => {
+    test.skip(isMobile === true, 'solo con puntero');
+    await page.goto('/?build=0');
+    const x = (viewport?.width ?? 1440) / 2;
+    const y = (viewport?.height ?? 900) / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.move(x + 2, y + 2);
+    await page.waitForTimeout(1400);
+    const { agents, scroll } = await read(page);
+    expect(agents.length).toBeGreaterThan(0);
+    for (const agent of agents) {
+      const distance = Math.hypot(agent.x - x, agent.y - scroll - y);
+      expect(agent.mode).toBe('orbit');
+      expect(distance).toBeLessThan(190);
+      expect(agent.alpha).toBeGreaterThan(0.5);
+    }
+    // Se mueven de verdad: siguen orbitando sin que el cursor se mueva.
+    await page.waitForTimeout(300);
+    const later = await read(page);
+    const moved = later.agents.filter((a, i) => Math.hypot(a.x - (agents[i]?.x ?? 0), a.y - (agents[i]?.y ?? 0)) > 4);
+    expect(moved.length).toBeGreaterThan(agents.length / 2);
+  });
+
+  test('siguen al cursor cuando se mueve', async ({ page, viewport }) => {
+    await page.goto('/?build=0');
+    await page.mouse.move(120, 120);
+    await page.mouse.move(122, 122);
+    await page.waitForTimeout(800);
+    const x = (viewport?.width ?? 1440) - 160;
+    const y = (viewport?.height ?? 900) - 160;
+    await page.mouse.move(x, y, { steps: 6 });
+    await page.waitForTimeout(1200);
+    const { agents, scroll } = await read(page);
+    for (const agent of agents) expect(Math.hypot(agent.x - x, agent.y - scroll - y)).toBeLessThan(190);
+  });
+
+  test('salen a construir y después vuelven a la órbita', async ({ page }) => {
+    await page.goto('/?build=1');
+    await page.mouse.move(300, 300);
+    await page.mouse.move(302, 302);
+    await page.waitForFunction(() => {
+      const swarm = (window as unknown as { __rpSwarm?: { agents: Array<{ mode: string }> } }).__rpSwarm;
+      return (swarm?.agents.filter((a) => a.mode === 'task').length ?? 0) > 3;
+    }, undefined, { timeout: 5000 });
+    await heroBuilt(page);
+    await page.waitForTimeout(1200);
+    const { agents, scroll } = await read(page);
+    for (const agent of agents) {
+      expect(agent.mode).toBe('orbit');
+      expect(Math.hypot(agent.x - 302, agent.y - scroll - 302)).toBeLessThan(190);
+    }
+  });
+
+  test('al pasar sobre un botón, cuatro agentes toman sus esquinas', async ({ page }) => {
+    await page.goto('/?build=0');
+    await page.mouse.move(40, 40);
+    await page.mouse.move(42, 42);
+    await page.waitForTimeout(500);
+    const box = await page.locator('.cta .btn--primary').boundingBox();
+    if (!box) throw new Error('sin botón');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.waitForTimeout(800);
+    const { agents, scroll } = await read(page);
+    const pinned = agents.filter((a) => a.mode === 'pin');
+    expect(pinned).toHaveLength(4);
+    const corners = [[box.x, box.y], [box.x + box.width, box.y], [box.x + box.width, box.y + box.height], [box.x, box.y + box.height]];
+    for (const [cx = 0, cy = 0] of corners) {
+      const nearest = Math.min(...pinned.map((a) => Math.hypot(a.x - cx, a.y - scroll - cy)));
+      expect(nearest).toBeLessThan(12);
+    }
+    await page.mouse.move(40, 40, { steps: 3 });
+    await page.waitForTimeout(300);
+    expect((await read(page)).agents.filter((a) => a.mode === 'pin')).toHaveLength(0);
   });
 });
 

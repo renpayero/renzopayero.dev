@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 import { ui, type Lang, type RoleId } from '../i18n/ui';
-import { Crew, seeded } from './agents';
-import { Overlay } from './overlay';
+import { getSwarm } from '../swarm/swarm';
+import { Crew } from './agents';
 import type { PlanContext } from './plans/context';
 import { heroPlan } from './plans/hero';
 import { sectionPlan } from './plans/section';
@@ -33,9 +33,8 @@ class Director {
   private readonly root = document.documentElement;
   private readonly lang: Lang = this.root.lang === 'en' ? 'en' : 'es';
   private readonly t = ui[this.lang];
-  private readonly overlay = new Overlay();
-  private readonly random = seeded(20261105);
-  private readonly crew = new Crew(this.overlay, this.t.roles, this.random);
+  private readonly swarm = getSwarm();
+  private readonly crew = new Crew(this.swarm);
   private readonly sections = [...document.querySelectorAll<HTMLElement>('[data-section]')];
   private readonly queue: HTMLElement[] = [];
   private readonly segments: HTMLElement[] = [];
@@ -110,15 +109,10 @@ class Director {
 
   private context(cleanups: Array<() => void>): PlanContext {
     return {
-      overlay: this.overlay,
+      overlay: this.swarm.overlay,
       crew: this.crew,
-      random: this.random,
       announce: (step) => this.announce(step),
       onCleanup: (fn) => cleanups.push(fn),
-      dock: () => {
-        const r = this.hud.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 + scrollY };
-      },
     };
   }
 
@@ -147,7 +141,7 @@ class Director {
       this.segments[index]?.style.setProperty('--p', String(timeline.progress()));
     });
     timeline.eventCallback('onComplete', () => this.settle(true));
-    this.overlay.start();
+    this.swarm.setBusy(true);
     timeline.play();
   }
 
@@ -178,8 +172,9 @@ class Director {
       gsap.set(document.querySelectorAll('[data-b="nav"]'), { clearProps: 'all' });
       this.remember();
     }
-    this.overlay.clear();
-    this.overlay.stop();
+    this.swarm.overlay.clear();
+    for (const agent of this.swarm.agents) this.swarm.release(agent);
+    this.swarm.setBusy(false);
     const index = this.sections.indexOf(section);
     this.segments[index]?.classList.remove('is-active');
     this.segments[index]?.classList.add('is-done');
@@ -248,7 +243,6 @@ class Director {
     this.trigger.disconnect();
     removeEventListener('keydown', this.onKey);
     removeEventListener('resize', this.onResize);
-    this.overlay.destroy();
     this.root.dataset.build = 'done';
     dispatchEvent(new Event('rp:release'));
     if (!ranFull) {
@@ -283,7 +277,6 @@ class Director {
 
   // En móvil la barra del navegador cambia el alto al scrollear: solo el ancho invalida las medidas.
   private readonly onResize = (): void => {
-    this.overlay.resize();
     if (innerWidth !== this.startWidth) this.complete();
   };
 }

@@ -17,3 +17,6 @@ playwright-report/
 
 # Estado local de Claude Code
 .claude/scheduled_tasks.lock
+
+# Cuadros temporales de grabación
+.cache/

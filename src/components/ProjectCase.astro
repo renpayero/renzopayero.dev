@@ -1,0 +1,257 @@
+---
+import { getImage } from 'astro:assets';
+import { posters } from '../lib/project-media';
+import { projects, projectUi, type Slug } from '../i18n/projects';
+import type { Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  slug: Slug;
+}
+
+const { lang, slug } = Astro.props;
+const t = projectUi[lang];
+const list = projects[lang];
+const index = list.findIndex((p) => p.slug === slug);
+const project = list[index];
+if (!project) throw new Error(`proyecto desconocido: ${slug}`);
+const next = list[(index + 1) % list.length];
+const base = lang === 'es' ? '' : '/en';
+const home = lang === 'es' ? '/' : '/en/';
+const poster = (await getImage({ src: posters[slug], width: 1280, format: 'webp', quality: 78 })).src;
+---
+<header class="case-top">
+  <a class="case-top__back" href={`${home}#proyectos`}>{t.back}</a>
+  <a class="btn case-top__visit" href={project.url} rel="noopener" target="_blank">{t.visit}</a>
+</header>
+
+<article class="case">
+  <div class="wrap case__head">
+    {project.demo && <p class="tile__badge case__badge">{t.demo}</p>}
+    <p class="case__name">{project.name}</p>
+    <h1 class="case__title">{project.tagline}<br /><span class="tone">{project.tone}</span></h1>
+  </div>
+
+  <figure class="wrap case__media" style={`view-transition-name:media-${slug}`}>
+    <video src={`/video/${slug}.mp4`} poster={poster} autoplay muted loop playsinline width="1280" height="720" aria-hidden="true" data-case-video></video>
+  </figure>
+
+  <div class="wrap case__grid">
+    <p class="case__summary reveal">{project.summary}</p>
+    <dl class="case__facts reveal">
+      <div>
+        <dt>{t.role}</dt>
+        <dd>{project.role}</dd>
+      </div>
+      <div>
+        <dt>{t.stack}</dt>
+        <dd>
+          <ul class="bento__items case__stack">
+            {project.stack.map((item) => <li>{item}</li>)}
+          </ul>
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <section class="wrap case__decisions">
+    <h2 class="h2 reveal">{t.decisions}</h2>
+    <ol class="case__list">
+      {
+        project.decisions.map((decision) => (
+          <li class="case__decision reveal">
+            <h3>{decision.title}</h3>
+            <p>{decision.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  {
+    next && (
+      <a class="wrap case__next reveal" href={`${base}/proyectos/${next.slug}/`}>
+        <span class="case__next-label">{t.next}</span>
+        <span class="case__next-name">{next.name}</span>
+      </a>
+    )
+  }
+</article>
+
+<script>
+  // Con movimiento reducido el video no arranca solo: queda el póster.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelector<HTMLVideoElement>('[data-case-video]')?.pause();
+  }
+</script>
+
+<style is:global>
+  .case-top {
+    position: sticky;
+    top: 12px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1260px;
+    margin: 12px auto 0;
+    padding-inline: clamp(16px, 3vw, 24px);
+    pointer-events: none;
+  }
+
+  .case-top > * {
+    pointer-events: auto;
+    background: rgb(24 19 23 / 0.82);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+  }
+
+  .case-top__back {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding-inline: 18px;
+    border: 1px solid rgb(245 242 244 / 0.08);
+    border-radius: 980px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .case {
+    padding-inline: clamp(16px, 3vw, 24px);
+    padding-bottom: 96px;
+  }
+
+  .case__head {
+    padding-top: clamp(48px, 7vw, 96px);
+  }
+
+  .case__badge {
+    display: inline-block;
+    margin-bottom: 14px;
+  }
+
+  .case__name {
+    color: var(--color-gris);
+    font-size: clamp(1.0625rem, 1.8vw, 1.5rem);
+    font-weight: 500;
+  }
+
+  .case__title {
+    margin-top: 8px;
+    font-size: clamp(2.5rem, 6.4vw, 5rem);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .case__media {
+    margin-top: clamp(32px, 5vw, 64px);
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+  }
+
+  .case__media video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  .case__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: clamp(32px, 5vw, 80px);
+    margin-top: clamp(56px, 8vw, 112px);
+  }
+
+  .case__summary {
+    font-size: clamp(1.3125rem, 2.3vw, 1.75rem);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  .case__facts {
+    display: grid;
+    align-content: start;
+    gap: 24px;
+  }
+
+  .case__facts dt {
+    margin-bottom: 6px;
+    color: var(--color-gris);
+    font-size: 0.875rem;
+  }
+
+  .case__stack {
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .case__decisions {
+    margin-top: clamp(80px, 11vw, 160px);
+  }
+
+  .case__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 16px;
+    margin-top: clamp(28px, 4vw, 48px);
+    list-style: none;
+  }
+
+  .case__decision {
+    padding: clamp(24px, 3vw, 36px);
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+  }
+
+  .case__decision h3 {
+    font-size: clamp(1.3125rem, 2vw, 1.625rem);
+    font-weight: 600;
+    line-height: 1.14;
+    letter-spacing: -0.01em;
+  }
+
+  .case__decision p {
+    margin-top: 12px;
+    color: rgb(245 242 244 / 0.72);
+    line-height: 1.42;
+  }
+
+  .case__next {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: clamp(80px, 11vw, 160px);
+    padding-top: 28px;
+    border-top: 1px solid rgb(245 242 244 / 0.12);
+  }
+
+  .case__next-label {
+    color: var(--color-gris);
+    font-size: 0.9375rem;
+  }
+
+  .case__next-name {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 600;
+    line-height: 1.07;
+    letter-spacing: -0.015em;
+    transition: color 0.32s var(--ease-apple);
+  }
+
+  .case__next:hover .case__next-name {
+    color: var(--color-gris);
+  }
+
+  @media (max-width: 767px) {
+    .case__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

@@ -1,13 +1,37 @@
-import gsap from 'gsap';
+import type { RoleId } from '../i18n/ui';
 
+export type AgentMode = 'orbit' | 'task' | 'pin';
+
+export const TRAIL = 10;
+
+/** Agente en coordenadas de documento. En órbita lo mueve la física; en tarea, el timeline. */
 export interface Agent {
+  role: RoleId;
+  name: string;
+  color: string;
+  mode: AgentMode;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
+  angle: number;
   alpha: number;
   scale: number;
   tag: number;
-  color: string;
-  name: string;
+  depth: number;
+  radius: number;
+  speed: number;
+  phase: number;
+  tilt: number;
+  spin: number;
+  stiffness: number;
+  pinX: number;
+  pinY: number;
+  aimX: number;
+  aimY: number;
+  trailX: Float32Array;
+  trailY: Float32Array;
+  trailAt: number;
 }
 
 /** Marco de wireframe en coordenadas de documento. `grow` lo despliega desde su esquina. */
@@ -38,20 +62,31 @@ export interface Note {
   text: string;
 }
 
+export interface Ripple {
+  x: number;
+  y: number;
+  age: number;
+}
+
 const LINE = '208, 139, 189'; // ciruela claro: el color de las herramientas, nunca de la página
 const CHIP = '#714b67';
 const INK = '#f5f2f4';
-const ARROW = new Path2D('M0 0 L0 15.5 L4.2 11.8 L6.9 18 L9.9 16.7 L7.2 10.7 L12.6 10.4 Z');
+const ARROW = 'M0 0 L0 15.5 L4.2 11.8 L6.9 18 L9.9 16.7 L7.2 10.7 L12.6 10.4 Z';
+const SPRITE_SIZE = 56;
+const SPRITE_ORIGIN = 20;
+const RIPPLE_LIFE = 0.55;
 
 export class Overlay {
-  readonly agents: Agent[] = [];
   readonly frames: Frame[] = [];
+  readonly hoverFrames: Frame[] = [];
   readonly guides: Guide[] = [];
   readonly notes: Note[] = [];
+  readonly ripples: Ripple[] = [];
 
   private readonly canvas = document.createElement('canvas');
   private readonly ctx: CanvasRenderingContext2D;
   private readonly mono: string;
+  private readonly sprites = new Map<string, HTMLCanvasElement>();
   private dpr = 1;
   private width = 0;
   private height = 0;
@@ -62,6 +97,7 @@ export class Overlay {
     this.ctx = ctx;
     this.mono = getComputedStyle(document.documentElement).getPropertyValue('--font-geist') || 'monospace';
     this.canvas.setAttribute('aria-hidden', 'true');
+    this.canvas.dataset.swarm = '';
     this.canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:40;pointer-events:none';
     document.body.append(this.canvas);
     this.resize();
@@ -73,17 +109,7 @@ export class Overlay {
     this.height = innerHeight;
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
-  }
-
-  start(): void {
-    gsap.ticker.remove(this.render);
-    gsap.ticker.add(this.render);
-  }
-
-  /** Sin build activo no se gasta ni un cuadro. */
-  stop(): void {
-    gsap.ticker.remove(this.render);
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.sprites.clear();
   }
 
   clear(): void {
@@ -92,21 +118,80 @@ export class Overlay {
     this.notes.length = 0;
   }
 
-  destroy(): void {
-    gsap.ticker.remove(this.render);
-    this.canvas.remove();
+  /** La flecha con su halo se dibuja una vez por color: rotarla después es solo copiar un bitmap. */
+  private sprite(color: string): HTMLCanvasElement {
+    const cached = this.sprites.get(color);
+    if (cached) return cached;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = SPRITE_SIZE * this.dpr;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(this.dpr, this.dpr);
+      ctx.translate(SPRITE_ORIGIN, SPRITE_ORIGIN);
+      const arrow = new Path2D(ARROW);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = color;
+      ctx.fill(arrow);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(11, 7, 10, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.fill(arrow);
+      ctx.stroke(arrow);
+    }
+    this.sprites.set(color, canvas);
+    return canvas;
   }
 
-  private readonly render = (): void => {
+  render(agents: Agent[]): void {
     const { ctx } = this;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
     const scroll = scrollY;
     for (const guide of this.guides) this.drawGuide(guide, scroll);
     for (const frame of this.frames) this.drawFrame(frame, scroll);
+    for (const frame of this.hoverFrames) this.drawFrame(frame, scroll);
     for (const note of this.notes) this.drawNote(note, scroll);
-    for (const agent of this.agents) this.drawAgent(agent, scroll);
-  };
+    this.drawRipples(scroll);
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (const agent of agents) this.drawTrail(agent, scroll);
+    ctx.globalCompositeOperation = 'source-over';
+    // Los que pasan por detrás se pintan primero: la profundidad también es orden.
+    const ordered = agents.slice().sort((a, b) => a.depth - b.depth);
+    for (const agent of ordered) this.drawAgent(agent, scroll);
+  }
+
+  private drawTrail(a: Agent, scroll: number): void {
+    if (a.alpha <= 0.02) return;
+    const { ctx } = this;
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth = 1.1;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = a.alpha * (0.22 + 0.16 * a.depth);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y - scroll);
+    for (let i = 0; i < TRAIL; i++) {
+      const x = a.trailX[i] ?? a.x;
+      const y = a.trailY[i] ?? a.y;
+      ctx.lineTo(x, y - scroll);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  private drawRipples(scroll: number): void {
+    const { ctx } = this;
+    for (const ripple of this.ripples) {
+      const t = ripple.age / RIPPLE_LIFE;
+      if (t >= 1) continue;
+      ctx.strokeStyle = `rgba(${LINE}, ${(1 - t) * 0.7})`;
+      ctx.lineWidth = 1.5 * (1 - t) + 0.25;
+      ctx.beginPath();
+      ctx.arc(ripple.x, ripple.y - scroll, 8 + 120 * (1 - (1 - t) ** 3), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
 
   private drawGuide(g: Guide, scroll: number): void {
     if (g.alpha <= 0.01 || g.draw <= 0) return;
@@ -164,16 +249,17 @@ export class Overlay {
   private drawAgent(a: Agent, scroll: number): void {
     if (a.alpha <= 0.01) return;
     const { ctx } = this;
+    const near = (a.depth + 1) / 2;
+    const size = a.scale * (0.76 + 0.34 * near);
     ctx.save();
-    ctx.globalAlpha = a.alpha;
+    ctx.globalAlpha = a.alpha * (0.5 + 0.5 * near);
     ctx.translate(a.x, a.y - scroll);
-    ctx.scale(a.scale, a.scale);
-    ctx.fillStyle = a.color;
-    ctx.strokeStyle = 'rgba(11, 7, 10, 0.9)';
-    ctx.lineWidth = 1;
-    ctx.fill(ARROW);
-    ctx.stroke(ARROW);
+    ctx.rotate(a.angle);
+    ctx.scale(size, size);
+    ctx.drawImage(this.sprite(a.color), -SPRITE_ORIGIN, -SPRITE_ORIGIN, SPRITE_SIZE, SPRITE_SIZE);
     ctx.restore();
     if (a.tag > 0.01) this.drawChip(a.name, a.x + 12, a.y - scroll + 16, a.alpha * a.tag, a.color, '#0b070a', false);
   }
 }
+
+export { RIPPLE_LIFE };
