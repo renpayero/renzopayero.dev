@@ -32,6 +32,7 @@ const person = {
   '@context': 'https://schema.org',
   '@type': 'Person',
   name: 'Renzo Payero',
+  ...(site ? { url: new URL('/', site).href } : {}),
   jobTitle: lang === 'es' ? 'Ingeniero en Sistemas' : 'Systems Engineer',
   email: 'mailto:rpayerodev@gmail.com',
   address: { '@type': 'PostalAddress', addressLocality: 'Rosario', addressRegion: 'Santa Fe', addressCountry: 'AR' },

@@ -1,0 +1,15 @@
+# Producción en el VPS: sin puertos propios, detrás de Nginx Proxy Manager, que enruta por nombre de contenedor.
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+name: renzopayero
+services:
+  web:
+    container_name: renzopayero-web
+    ports: !reset []
+    network_mode: !reset null
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    name: nginx_default
+    external: true

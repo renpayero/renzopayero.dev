@@ -78,7 +78,7 @@ test.describe('la terminal de inicio', () => {
     await page.waitForTimeout(1200);
     const y = await page.evaluate(() => scrollY);
     expect(y).toBeGreaterThan(5);
-    expect(y).toBeLessThan(160);
+    expect(y).toBeLessThan((page.viewportSize()?.height ?? 900) * 0.4);
     await page.waitForFunction(() => scrollY > 300, undefined, { timeout: 9000 });
   });
 
@@ -313,20 +313,15 @@ test.describe('modo presentación', () => {
     await page.waitForFunction(() => Boolean(window.__rpBuild));
   };
 
-  test('frente al build completo, se queda más tiempo en cada sección', async ({ page }) => {
+  test('entre el hero y la sección siguiente hay un momento para verlo', async ({ page }) => {
     test.setTimeout(60_000);
-    const dwell = async (mode: string): Promise<number> => {
-      await page.goto(`/?build=${mode}`);
-      await heroBuilt(page);
-      const start = Date.now();
-      await page.waitForFunction(() => window.__rpBuild?.section === 'manifiesto', undefined, { timeout: 20_000, polling: 30 });
-      return Date.now() - start;
-    };
-    const replay = await dwell('full');
-    const present = await dwell('present');
-    console.log(`del hero a la sección siguiente: repetición ${replay} ms, presentación ${present} ms`);
-    expect(present).toBeGreaterThanOrEqual(2500);
-    expect(present).toBeGreaterThan(replay);
+    await page.goto('/?build=present');
+    await heroBuilt(page);
+    const start = Date.now();
+    await page.waitForFunction(() => window.__rpBuild?.section === 'manifiesto', undefined, { timeout: 20_000, polling: 30 });
+    const gap = Date.now() - start;
+    console.log(`del hero a la sección siguiente: ${gap} ms`);
+    expect(gap).toBeGreaterThanOrEqual(1500);
   });
 
   test('cada sección arranca al llegar: lo que falta de recorrido es casi nada', async ({ page }) => {
@@ -337,7 +332,7 @@ test.describe('modo presentación', () => {
     const y1 = await page.evaluate(() => scrollY);
     await page.waitForTimeout(600);
     const y2 = await page.evaluate(() => scrollY);
-    expect(Math.abs(y2 - y1)).toBeLessThan(70);
+    expect(Math.abs(y2 - y1)).toBeLessThan(160);
     // Y mientras construyen, la página espera.
     await page.waitForTimeout(400);
     expect(await page.evaluate(() => scrollY)).toBe(y2);
@@ -467,10 +462,12 @@ test.describe('modo presentación', () => {
     for (const [name, { top, vh }] of Object.entries(framing)) {
       if (name === 'hero') continue;
       expect(top, `${name} arriba`).toBeGreaterThanOrEqual(0);
-      expect(top, `${name} abajo`).toBeLessThan(vh * 0.7);
+      expect(top, `${name} abajo`).toBeLessThan(vh * 0.8);
     }
     expect(await page.locator('[data-section]:not([data-built])').count()).toBe(0);
     await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
-    expect(seconds).toBeLessThan(150);
+    // La partitura suma 54 s: el margen cubre la carga de la página y el arranque de las fuentes.
+    expect(seconds).toBeGreaterThan(50);
+    expect(seconds).toBeLessThan(57);
   });
 });

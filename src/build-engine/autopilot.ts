@@ -20,7 +20,7 @@ export interface Pilot {
 interface Ride {
   from: number;
   to: number;
-  /** Cuánto avanza mientras se lee: despacio, para que el contenido siga a la vista. */
+  /** Cuánto avanza en la primera parte: despacio, para que el contenido siga a la vista. */
   drift: number;
   read: number;
   move: number;
@@ -28,25 +28,47 @@ interface Ride {
   onNear?: () => void;
 }
 
+/**
+ * La partitura de la presentación, en segundos: cuánto tienen los agentes para construir cada
+ * sección y cuánto dura la salida hacia la siguiente. Suma 54 s; con el segundo de arranque en la
+ * terminal, 55 s. Para cambiar el ritmo alcanza con tocar estos números.
+ */
+const SCORE: Record<string, { build: number; leave: number }> = {
+  hero: { build: 3.3, leave: 2.1 },
+  manifiesto: { build: 2, leave: 2.4 },
+  sistema: { build: 2, leave: 1.7 },
+  escena: { build: 3, leave: 2.4 },
+  proyectos: { build: 3, leave: 5.9 },
+  galeria: { build: 2.1, leave: 6.9 },
+  experiencia: { build: 2, leave: 3.6 },
+  capacidades: { build: 2.8, leave: 2.3 },
+  como: { build: 2.6, leave: 1.7 },
+  contacto: { build: 2.2, leave: 0 },
+};
+
+/** Las filas sueltas acompañan el ritmo de las secciones. */
+export const MICRO_SPEED = 1.5;
+/** El giro del teléfono entra en su lugar de la partitura sin perder la animación. */
+const DEVICE_RATE = 1.3;
+/** Cuánto hay que apurar a los agentes para que la sección entre en su lugar. Nunca se los frena. */
+export const presentSpeed = (section: HTMLElement, duration: number): number => {
+  const build = SCORE[section.dataset.section ?? '']?.build;
+  return build ? Math.max(1, duration / build) : 1;
+};
+
 const INTERRUPTS = ['wheel', 'touchstart', 'pointerdown'] as const;
 const KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Tab']);
 const OWN_CONTROLS = '[data-hud], [data-swarm-toggle]';
 
-/** El ritmo de la presentación: da para leer, sin esperas de más. Lectura ágil: unas 330 palabras por minuto. */
-const WORDS_PER_SECOND = 5.5;
-const LOOK_S = 0.6;
-const MIN_READ_S = 1.6;
-const MAX_READ_S = 4;
-const LONG_READ_MAX_S = 6.5;
-const TILE_READ_S = 2.3;
-const TILE_MOVE_S = 0.7;
-const VIDEO_FALLBACK_S = 6.4;
 /** La velocidad de la deriva: se nota que la página sigue viva y el texto se lee igual. */
 const DRIFT_PX_PER_S = 34;
-const RAMP_S = 0.5;
-const MOVE_MIN_S = 0.9;
-const MOVE_MAX_S = 2.2;
-const MOVE_PX_PER_S = 900;
+const RAMP_S = 0.4;
+const MIN_LEAVE_S = 0.7;
+const MOVE_MIN_S = 0.6;
+const MOVE_MAX_S = 1;
+const MOVE_PX_PER_S = 1000;
+const GALLERY_EXIT_S = 1.4;
+const TILE_MOVE_SHARE = 0.38;
 /** La próxima sección arranca un instante antes de llegar: nunca hay un cuadro sin nada en marcha. */
 const BUILD_LEAD_S = 0.18;
 const POLL_MS = 20;
@@ -56,27 +78,9 @@ const LEAD_TOP = { min: 96, ratio: 0.18, max: 170 };
 const topOf = (el: Element): number => el.getBoundingClientRect().top + scrollY;
 const scrollToY = (y: number): void => window.scrollTo({ top: y, behavior: 'instant' });
 
-/** Las palabras que están en pantalla, o las que faltan: el tiempo sale del contenido real. */
-function countWords(root: Element, inView: boolean): number {
-  let words = 0;
-  const range = document.createRange();
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    const text = node.nodeValue?.trim();
-    if (!text || node.parentElement?.closest('[aria-hidden="true"]')) continue;
-    range.selectNodeContents(node);
-    const r = range.getBoundingClientRect();
-    if (!r.width) continue;
-    const on = r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
-    if (on === inView) words += text.split(/\s+/).length;
-  }
-  return words;
-}
-
 /**
- * La posición en cada instante de un recorrido: arranca suave, deriva a velocidad constante mientras
- * se lee y después se apura hasta frenar justo en el destino, sin cambios bruscos de velocidad.
+ * La posición en cada instante de un recorrido: arranca suave, deriva a velocidad constante y
+ * después se apura hasta frenar justo en el destino, sin cambios bruscos de velocidad.
  */
 function profile({ from, to, drift, read, move }: Ride): (t: number) => number {
   const total = to - from;
@@ -95,15 +99,28 @@ function profile({ from, to, drift, read, move }: Ride): (t: number) => number {
 }
 
 /**
- * Recorre la página sola mientras los agentes construyen. `full` es la repetición, con el ritmo de
- * un reel. `present` es para verla por primera vez: da tiempo a leer cada sección y al video del
- * dispositivo, pero nunca se queda quieta: o construyen los agentes o la página se está moviendo.
- * Cualquier gesto devuelve el control al instante.
+ * Recorre la página sola mientras los agentes construyen. `full` es la repetición, a su ritmo.
+ * `present` es la presentación: entra en menos de un minuto, para poder grabarla, y nunca se queda
+ * quieta: o construyen los agentes o la página se está moviendo. Cualquier gesto devuelve el control.
  */
 export function runAutopilot({ sections, isBuilt, pace, request, onStop }: AutopilotDeps): Pilot {
   let stopped = false;
   let paused = false;
   let tween: gsap.core.Tween | null = null;
+
+  // El reloj de la partitura se detiene con la pausa y con la pestaña oculta.
+  const startedAt = performance.now();
+  let frozenAt = 0;
+  let frozenFor = 0;
+  const syncClock = (): void => {
+    const now = performance.now();
+    if ((paused || document.hidden) && !frozenAt) frozenAt = now;
+    else if (!paused && !document.hidden && frozenAt) {
+      frozenFor += now - frozenAt;
+      frozenAt = 0;
+    }
+  };
+  const clock = (): number => ((frozenAt || performance.now()) - startedAt - frozenFor) / 1000;
 
   const onGesture = (event: Event): void => {
     if (event.type !== 'wheel' && event.target instanceof Element && event.target.closest(OWN_CONTROLS)) return;
@@ -117,6 +134,7 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
   const unlisten = (): void => {
     for (const type of INTERRUPTS) removeEventListener(type, onGesture);
     removeEventListener('keydown', onKey);
+    document.removeEventListener('visibilitychange', syncClock);
   };
   const stop = (): void => {
     if (stopped) return;
@@ -127,6 +145,7 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
   };
   for (const type of INTERRUPTS) addEventListener(type, onGesture, { passive: true });
   addEventListener('keydown', onKey);
+  document.addEventListener('visibilitychange', syncClock);
 
   /** Una espera real: la pausa la congela, con la pestaña oculta no corre y un gesto la corta. */
   const sleep = (ms: number): Promise<void> =>
@@ -205,8 +224,14 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
     }
   };
 
-  const reading = (root: Element): number =>
-    gsap.utils.clamp(MIN_READ_S, MAX_READ_S, LOOK_S + countWords(root, true) / WORDS_PER_SECOND);
+  /** A qué segundo de la partitura tiene que estar llegando a la sección siguiente. */
+  const deadlines = new Map<HTMLElement, number>();
+  let sum = 0;
+  for (const section of sections) {
+    const part = SCORE[section.dataset.section ?? ''];
+    sum += (part?.build ?? 2) + (part?.leave ?? 2);
+    deadlines.set(section, sum);
+  }
 
   /** Dónde tiene que quedar la página para que la sección se vea entera, con aire para seguir bajando. */
   const stopFor = (section: HTMLElement): number => {
@@ -219,8 +244,8 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
     return Math.max(0, Math.min(top, (lead ? topOf(lead) : top) - room));
   };
 
-  /** Un proyecto por vez: la galería nunca frena, cada baldosa pasa despacio y salta a la siguiente. */
-  const tour = async (gallery: Element): Promise<void> => {
+  /** Un proyecto por vez hasta el segundo indicado: la galería nunca frena y cada baldosa pasa despacio. */
+  const tour = async (gallery: Element, until: number): Promise<void> => {
     const track = gallery.querySelector<HTMLElement>('[data-gallery-track]');
     const tiles = [...gallery.querySelectorAll<HTMLElement>('[data-tile]')];
     if (!track || tiles.length < 2) return;
@@ -231,60 +256,58 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
       const r = track.getBoundingClientRect();
       return track.scrollLeft + t.left - r.left - (r.width - t.width) / 2;
     };
-    for (const tile of tiles.slice(1)) {
+    const rest = tiles.slice(1);
+    for (const [i, tile] of rest.entries()) {
       if (stopped) break;
+      const total = Math.max(MIN_LEAVE_S, (until - clock()) / (rest.length - i));
+      const move = total * TILE_MOVE_SHARE;
+      const read = total - move;
       await ride({
         from: track.scrollLeft,
         to: centered(tile),
-        drift: DRIFT_PX_PER_S * TILE_READ_S,
-        read: TILE_READ_S,
-        move: TILE_MOVE_S,
+        drift: DRIFT_PX_PER_S * read,
+        read,
+        move,
         apply: (x) => track.scrollTo({ left: x, behavior: 'instant' }),
       });
     }
     track.style.removeProperty('scroll-snap-type');
   };
 
-  /** Lo que queda por leer de la sección, y a qué velocidad se puede bajar mientras tanto. */
-  const leaving = (section: HTMLElement): { read: number; drift: number } => {
+  /** Cuánto avanza la página antes de apurarse: lo que queda de la sección, o una deriva lenta. */
+  const driftOf = (section: HTMLElement, read: number): number => {
     const below = Math.max(0, section.getBoundingClientRect().bottom - innerHeight);
-    const device = section.querySelector<HTMLElement>('[data-device]');
+    const device = section.querySelector('[data-device]');
     if (device) {
-      // El texto del costado se lee mientras gira el teléfono: el recorrido dura lo que dura el giro.
-      const video = device.querySelector('video');
-      const left = video?.ended ? 0 : video && video.duration > 0 ? video.duration - video.currentTime : VIDEO_FALLBACK_S;
+      // El teléfono pasa por el centro mientras gira, y no se va de pantalla antes de terminar.
       const r = device.getBoundingClientRect();
-      const toCenter = r.top + r.height / 2 - innerHeight / 2;
-      return { read: Math.max(MIN_READ_S, left + 0.3), drift: Math.min(Math.max(toCenter + 60, below), Math.max(r.bottom, 0)) };
+      return Math.min(Math.max(r.top + r.height / 2 - innerHeight / 2 + 60, below), Math.max(r.bottom, 0));
     }
-    // Lo que falta más abajo se lee mientras baja: como un teleprompter, sin sobrepasar la sección.
-    const read = Math.min(LONG_READ_MAX_S, reading(section) + countWords(section, false) / WORDS_PER_SECOND);
-    return { read, drift: Math.max(below, DRIFT_PX_PER_S * read) };
+    return Math.max(below, DRIFT_PX_PER_S * read);
   };
 
   const leave = async (section: HTMLElement, next: HTMLElement): Promise<void> => {
-    // La escena fija no cambia mientras dura: el salto al final de su recorrido no se ve, y sale despacio.
+    // La escena fija no cambia mientras dura: el salto al final de su recorrido no se ve.
     if (section.dataset.start === 'top') scrollToY(topOf(section) + section.offsetHeight - innerHeight);
     // El video del dispositivo tiene que llegar cargado: el giro no puede arrancar tarde.
     const video = next.querySelector<HTMLVideoElement>('[data-device] video');
-    if (video) video.preload = 'auto';
+    if (video) {
+      video.preload = 'auto';
+      video.defaultPlaybackRate = DEVICE_RATE;
+      video.playbackRate = DEVICE_RATE;
+    }
 
+    const deadline = deadlines.get(section) ?? clock();
     const gallery = section.closest('[data-gallery]') ?? section.querySelector('[data-gallery]');
-    if (gallery) await tour(gallery);
+    if (gallery) await tour(gallery, deadline - GALLERY_EXIT_S);
     if (stopped) return;
 
-    const { read, drift } = gallery ? { read: TILE_READ_S, drift: DRIFT_PX_PER_S * TILE_READ_S } : leaving(section);
+    const total = Math.max(MIN_LEAVE_S, deadline - clock());
     const from = scrollY;
     const to = Math.min(stopFor(next), document.documentElement.scrollHeight - innerHeight);
-    await ride({
-      from,
-      to,
-      drift,
-      read,
-      move: gsap.utils.clamp(MOVE_MIN_S, MOVE_MAX_S, (to - from - drift) / MOVE_PX_PER_S),
-      apply: scrollToY,
-      onNear: () => request(next),
-    });
+    const move = gsap.utils.clamp(Math.min(MOVE_MIN_S, total * 0.6), Math.min(MOVE_MAX_S, total * 0.6), (to - from) / MOVE_PX_PER_S);
+    const read = total - move;
+    await ride({ from, to, drift: driftOf(section, read), read, move, apply: scrollToY, onNear: () => request(next) });
   };
 
   const present = async (): Promise<void> => {
@@ -304,6 +327,7 @@ export function runAutopilot({ sections, isBuilt, pace, request, onStop }: Autop
     stop,
     setPaused: (value) => {
       paused = value;
+      syncClock();
       if (value) tween?.pause();
       else tween?.resume();
     },

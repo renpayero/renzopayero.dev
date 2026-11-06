@@ -2,7 +2,7 @@ import gsap from 'gsap';
 import { ui, type Lang, type RoleId } from '../i18n/ui';
 import { getSwarm } from '../swarm/swarm';
 import { Crew } from './agents';
-import { runAutopilot, type Pilot } from './autopilot';
+import { MICRO_SPEED, presentSpeed, runAutopilot, type Pilot } from './autopilot';
 import { loadAtlas } from './glyphs';
 import type { PlanContext } from './plans/context';
 import { heroPlan } from './plans/hero';
@@ -128,6 +128,8 @@ class Director {
     void loadAtlas().catch(() => undefined);
     void document.fonts.ready.then(() => {
       if (this.closed) return;
+      // Antes del hero: en presentación, también él entra en su lugar de la partitura.
+      this.held = this.root.dataset.pilot === 'present';
       this.run(hero);
       this.watchSections();
       if ('pilot' in this.root.dataset) this.startAutopilot();
@@ -143,12 +145,10 @@ class Director {
   }
 
   private startAutopilot(): void {
-    const pace = this.root.dataset.pilot === 'present' ? 'present' : 'full';
-    this.held = pace === 'present';
     this.pilot = runAutopilot({
       sections: this.sections,
       isBuilt: (section) => 'built' in section.dataset,
-      pace,
+      pace: this.held ? 'present' : 'full',
       request: (section) => this.request(section),
       onStop: () => this.takeBackControl(),
     });
@@ -204,6 +204,7 @@ class Director {
       this.segments[index]?.style.setProperty('--p', String(timeline.progress()));
     });
     timeline.eventCallback('onComplete', () => this.settle(true));
+    if (this.held) timeline.timeScale(presentSpeed(section, timeline.duration()));
     this.swarm.setBusy(true);
     timeline.play();
   }
@@ -263,6 +264,7 @@ class Director {
     const cleanups: Array<() => void> = [];
     const working = new Set<Agent>();
     const timeline = microPlan(row, this.context(cleanups, working), free);
+    if (this.held) timeline.timeScale(MICRO_SPEED);
     this.swarm.start();
     this.micros.add(timeline);
     timeline.eventCallback('onComplete', () => {

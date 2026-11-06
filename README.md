@@ -17,12 +17,20 @@ Parámetros útiles en la URL, todos saltean la terminal de inicio:
 | Parámetro | Qué hace |
 |---|---|
 | `?build=ask` | Abre la terminal aunque ya la hayas respondido |
-| `?build=present` | Modo presentación: construye y baja sola, con tiempo para leer y sin quedarse quieta nunca |
+| `?build=present` | Modo presentación: construye y baja sola en 55 s, sin quedarse quieta nunca |
 | `?build=full` | El build completo con ritmo de reel. Es lo que lanza el botón "Ver el build completo" |
 | `?build=1` | Construye al llegar con el scroll |
 | `?build=0` | La página final, sin construcción |
 
 La terminal aparece en la primera visita a la portada, y otra vez después de 7 días. Para volver a verla, usá `?build=ask`. Los buscadores no la ven: indexan la página final.
+
+## Producción
+
+https://renzopayero.dev corre en el VPS (`ssh vpsren`), en `/root/projects/renzopayero`, detrás de Nginx Proxy Manager y sin puertos propios.
+
+Para actualizarlo: commit y `sh scripts/deploy.sh`. Sube exactamente lo que está en git y reconstruye la imagen. Para probar contra producción: `TEST_BASE_URL=https://renzopayero.dev npx playwright test`.
+
+El proxy es un archivo, fuera de la interfaz de NPM: `/root/NGINX/data/nginx/proxy_host/renzopayero.conf`. El certificado se renueva con un cron del host (`crontab -l`).
 
 ## Cómo está armado
 
@@ -30,7 +38,7 @@ La terminal aparece en la primera visita a la portada, y otra vez después de 7 
 - **`src/swarm/`: el enjambre.** Física de órbita en 3D, inspección de elementos y canvas. Sin dependencias: se carga también en visitas repetidas.
 - **`src/build-engine/`: el motor de build.** Timelines de GSAP por sección, que piden agentes prestados al enjambre. Solo se descarga en la primera visita.
 - **`src/components/gate/` y `src/gate/`: la terminal de inicio.** El texto viene en el HTML y un script del `<head>` la abre antes del primer pintado. El agente y el modelo están en `src/i18n/gate.ts`, sin versión a propósito.
-- **`src/build-engine/autopilot.ts`: el recorrido solo.** El ritmo de la presentación son las constantes del principio del archivo.
+- **`src/build-engine/autopilot.ts`: el recorrido solo.** La duración de la presentación sale de la tabla `SCORE`, sección por sección. La versión anterior, de 97 s, queda en el tag `presentacion-97s`.
 - **`src/motion/`: el movimiento de la página.** Revelado por clase a 70vh, galería, telemetría. Las escenas atadas al scroll son CSS scroll-driven: corren sin JS y fuera del hilo principal.
 - **`integrations/`:** datos reales del build para "Cómo se hizo" y CSP con el hash exacto de cada script inline.
 

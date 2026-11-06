@@ -47,7 +47,7 @@ export const gateText: Record<Lang, GateText> = {
           value: 'present',
           label: 'Sí, en modo presentación',
           note: '(recomendado)',
-          desc: 'Los {n} agentes construyen cada sección delante tuyo y la página avanza sola, con tiempo para leer lo que hicieron. Cualquier gesto te devuelve el control.',
+          desc: 'Los {n} agentes construyen cada sección delante tuyo y la página avanza sola, en menos de un minuto. Cualquier gesto te devuelve el control.',
         },
         {
           value: 'manual',
@@ -99,7 +99,7 @@ export const gateText: Record<Lang, GateText> = {
           value: 'present',
           label: 'Yes, in presentation mode',
           note: '(recommended)',
-          desc: 'All {n} agents build each section in front of you and the page moves on by itself, with time to read what they did. Any gesture gives you back control.',
+          desc: 'All {n} agents build each section in front of you and the page moves on by itself, in under a minute. Any gesture gives you back control.',
         },
         {
           value: 'manual',
