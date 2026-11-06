@@ -27,6 +27,7 @@ export const ui = {
       built: (n: number, s: string) => `Construido por ${n} agentes en ${s} s`,
       progress: (done: number, total: number) => `${done} de ${total} secciones`,
       goLive: 'Go-live',
+      vectors: (n: number) => `${n} vectores`,
     },
     swarm: { toggle: 'Mostrar u ocultar los agentes' },
     roles: {
@@ -63,6 +64,7 @@ export const ui = {
       built: (n: number, s: string) => `Built by ${n} agents in ${s} s`,
       progress: (done: number, total: number) => `${done} of ${total} sections`,
       goLive: 'Go-live',
+      vectors: (n: number) => `${n} vectors`,
     },
     swarm: { toggle: 'Show or hide the agents' },
     roles: {

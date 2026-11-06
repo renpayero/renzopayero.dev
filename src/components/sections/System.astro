@@ -31,15 +31,15 @@ const links = c.links.map((label, i) => {
   return { label, parent, ...polar(parent.angle + delta, OUTER) };
 });
 ---
-<section class="system" data-section="sistema">
-  <div class="section system__intro">
+<section class="system">
+  <div class="section system__intro" data-section="sistema">
     <div class="wrap">
-      <h2 class="h2" data-type data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
+      <h2 class="h2" data-trace data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
       <p class="body-l system__lead reveal" data-frame>{c.lead}</p>
     </div>
   </div>
 
-  <div class="system__scene">
+  <div class="system__scene" data-section="escena" data-plan="system" data-start="top">
     <div class="system__pin">
       <div class="wrap system__layout">
         <div class="system__stage" aria-hidden="true">
@@ -55,7 +55,8 @@ const links = c.links.map((label, i) => {
               ))
             }
           </svg>
-          <span class="system__core">{c.core}</span>
+          <span class="system__glow"></span>
+          <span class="system__core"><span class="system__core-label" data-trace>{c.core}</span></span>
           {
             nodes.map((n, i) => (
               <span class="system__node" style={`left:${n.x}%;top:${n.y}%;--s:${12 + i * 7}`}>{n.label}</span>
@@ -153,13 +154,24 @@ const links = c.links.map((label, i) => {
     border: 2px solid var(--color-text);
     border-radius: 50%;
     background: var(--color-odoo);
+    font-size: clamp(1.25rem, 3.4vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    transform: translate(-50%, -50%);
+  }
+
+  /* El halo va aparte: su parpadeo solo cambia opacidad y no vuelve a pintar el círculo. */
+  .system__glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 26%;
+    aspect-ratio: 1;
+    border-radius: 50%;
     box-shadow:
       0 0 24px var(--color-odoo),
       0 0 72px var(--color-odoo),
       0 0 160px rgb(113 75 103 / 0.7);
-    font-size: clamp(1.25rem, 3.4vw, 2.5rem);
-    font-weight: 700;
-    letter-spacing: -0.02em;
     transform: translate(-50%, -50%);
   }
 
@@ -243,9 +255,14 @@ const links = c.links.map((label, i) => {
   /* El sistema se ensambla con el scroll. Sin soporte o con reduced motion, ya está armado. */
   @supports (animation-timeline: view()) {
     @media (prefers-reduced-motion: no-preference) {
+      /* Quien vuelve lo ve armarse con el scroll; la primera vez lo construyen los agentes. */
       .system__scene {
-        height: 340svh;
+        height: 210svh;
         view-timeline: --system block;
+      }
+
+      html:not([data-build]) .system__scene {
+        height: 340svh;
       }
 
       .system__pin {
@@ -254,29 +271,24 @@ const links = c.links.map((label, i) => {
         height: 100svh;
       }
 
-      .wire,
-      .system__node,
-      .system__link,
-      .system__stat,
-      .system__stage,
-      .system__core {
+      html:not([data-build]) :is(.wire, .system__node, .system__link, .system__stat, .system__core),
+      .system__stage {
         animation-timeline: --system;
         animation-timing-function: linear;
         animation-fill-mode: both;
       }
 
-      .wire {
+      html:not([data-build]) .wire {
         animation-name: wire-draw;
         animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
       }
 
-      .system__node,
-      .system__link {
+      html:not([data-build]) :is(.system__node, .system__link) {
         animation-name: node-in;
         animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
       }
 
-      .system__stat {
+      html:not([data-build]) .system__stat {
         animation-name: stat-in;
         animation-range: contain calc(var(--s) * 1%) contain calc((var(--s) + 7) * 1%);
       }
@@ -287,7 +299,7 @@ const links = c.links.map((label, i) => {
         animation-range: contain 0% contain 88%;
       }
 
-      .system__core {
+      html:not([data-build]) .system__core {
         animation-name: core-in;
         animation-range: contain 0% contain 10%;
       }
@@ -344,5 +356,14 @@ const links = c.links.map((label, i) => {
         }
       }
     }
+  }
+
+  /* Hasta que el equipo llega, el escenario está vacío. */
+  :is([data-build='pending'], [data-build='running']) [data-section='escena']:not([data-built]) :is(.system__node, .system__link, .system__stat, .system__core, .system__glow, .system__core-label) {
+    opacity: 0;
+  }
+
+  :is([data-build='pending'], [data-build='running']) [data-section='escena']:not([data-built]) .wire {
+    stroke-dashoffset: 1;
   }
 </style>

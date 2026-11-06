@@ -14,7 +14,7 @@ const today = rows[rows.length - 1];
 <section id="experiencia" class="section experience" data-section="experiencia">
   <div class="wrap experience__layout">
     <header class="experience__head">
-      <h2 class="h2" data-type data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
+      <h2 class="h2" data-trace data-frame>{c.title}<br /><span class="tone">{c.tone}</span></h2>
     </header>
 
     <ol class="git">
@@ -22,7 +22,7 @@ const today = rows[rows.length - 1];
         c.commits.map((commit, i) => {
           const row = rows[i];
           return (
-            <li class="git__row">
+            <li class="git__row" data-micro>
               <div class="git__graph" aria-hidden="true">
                 <div class="git__lines">
                   <svg class="git__top" viewBox={`0 0 ${GRAPH_WIDTH} ${TOP}`} width={GRAPH_WIDTH} height={TOP}>
@@ -34,7 +34,7 @@ const today = rows[rows.length - 1];
                 </div>
                 <span class:list={['git__dot', { 'is-live': row?.commitLive }]} style={`left:${row?.commitX}px;top:${row?.commitY}px`} />
               </div>
-              <div class="git__body reveal" data-frame style="--reveal-y:16px">
+              <div class="git__body reveal" style="--reveal-y:16px">
                 <time class="git__when mono">{commit.when}</time>
                 <h3 class="git__title">{commit.title}</h3>
                 <p class="git__org">{commit.org}</p>
@@ -44,7 +44,7 @@ const today = rows[rows.length - 1];
           );
         })
       }
-      <li class="git__row git__row--now">
+      <li class="git__row git__row--now" data-micro>
         <div class="git__graph" aria-hidden="true">
           <div class="git__lines">
             <svg class="git__top" viewBox={`0 0 ${GRAPH_WIDTH} ${TOP}`} width={GRAPH_WIDTH} height={TOP}>

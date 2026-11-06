@@ -12,7 +12,7 @@ const words = c.statement.split(' ');
 <section class="manifesto" data-section="manifiesto">
   <div class="manifesto__pin">
     <div class="wrap">
-      <p class="manifesto__text" data-frame style={`--n:${words.length}`}>
+      <p class="manifesto__text" data-trace data-frame style={`--n:${words.length}`}>
         {words.map((word, i) => <span class="manifesto__word" style={`--i:${i}`}>{word}{' '}</span>)}
       </p>
       <p class="body-l manifesto__detail reveal" data-frame>{c.detail}</p>
@@ -47,17 +47,17 @@ const words = c.statement.split(' ');
   /* Cada palabra se enciende con el scroll. Sin soporte o con reduced motion, todas encendidas. */
   @supports (animation-timeline: view()) {
     @media (prefers-reduced-motion: no-preference) {
-      .manifesto {
+      html:not([data-build]) .manifesto {
         height: 240svh;
         view-timeline: --manifesto block;
       }
 
-      .manifesto__pin {
+      html:not([data-build]) .manifesto__pin {
         position: sticky;
         top: 0;
       }
 
-      .manifesto__word {
+      html:not([data-build]) .manifesto__word {
         animation: word-on linear both;
         animation-timeline: --manifesto;
         animation-range: contain calc(var(--i) / var(--n) * 70%) contain calc((var(--i) + 1.6) / var(--n) * 70%);

@@ -17,12 +17,12 @@ const tiles = [
 ---
 <section class="section capabilities" data-section="capacidades">
   <div class="wrap">
-    <h2 class="h2" data-type data-frame>{c.title}</h2>
+    <h2 class="h2" data-trace data-frame>{c.title}</h2>
     <ul class="bento">
       {
         tiles.map((tile) => (
-          <li class={`bento__tile bento__tile--${tile.key} reveal`} data-frame>
-            <h3 class="bento__title">{tile.title}</h3>
+          <li class={`bento__tile bento__tile--${tile.key} reveal`} data-frame data-paint>
+            <h3 class="bento__title" data-trace>{tile.title}</h3>
             <p class="bento__text">{tile.text}</p>
             <ul class="bento__items">
               {tile.items.map((item) => <li>{item}</li>)}

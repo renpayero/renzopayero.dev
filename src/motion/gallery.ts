@@ -9,14 +9,27 @@ if (stage && deviceVideo) {
   if (reduced) {
     deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
   } else {
+    // Si el equipo la está construyendo, el teléfono es lo último: arranca con el go-live de la sección.
+    const owner = stage.closest<HTMLElement>('[data-section]');
+    const root = document.documentElement;
+    const released = (): boolean => !['pending', 'running'].includes(root.dataset.build ?? '') || 'built' in (owner?.dataset ?? {});
+    let arrived = false;
+    let started = false;
+    const play = (): void => {
+      if (started || !arrived || !released()) return;
+      started = true;
+      deviceVideo.preload = 'auto';
+      void deviceVideo.play().catch(() => {
+        deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
+      });
+    };
+    addEventListener('rp:release', play);
     new IntersectionObserver(
       ([entry], observer) => {
         if (!entry?.isIntersecting) return;
         observer.disconnect();
-        deviceVideo.preload = 'auto';
-        void deviceVideo.play().catch(() => {
-          deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
-        });
+        arrived = true;
+        play();
       },
       { rootMargin: '0px 0px -30% 0px' },
     ).observe(stage);

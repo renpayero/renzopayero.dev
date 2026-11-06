@@ -65,6 +65,32 @@ export interface Note {
   text: string;
 }
 
+/** Una letra que los agentes están dibujando, con sus puntos de control. */
+export interface Trace {
+  path: Path2D;
+  length: number;
+  x: number;
+  y: number;
+  scale: number;
+  width: number;
+  p: number;
+  alpha: number;
+  color: string;
+  cover: string;
+  points: Float32Array;
+  pointsAlpha: number;
+}
+
+/** Círculo de compás en coordenadas de documento. */
+export interface Arc {
+  x: number;
+  y: number;
+  r: number;
+  from: number;
+  p: number;
+  alpha: number;
+}
+
 export interface Ripple {
   x: number;
   y: number;
@@ -92,6 +118,12 @@ export class Overlay {
   readonly notes: Note[] = [];
   readonly ripples: Ripple[] = [];
   readonly tethers: Tether[] = [];
+  readonly traces: Trace[] = [];
+  readonly arcs: Arc[] = [];
+  /** Corrimiento de la escena fija respecto de cuando se midió: las herramientas la acompañan. */
+  dx = 0;
+  dy = 0;
+  private anchor: { el: Element; x: number; y: number } | null = null;
 
   private readonly canvas = document.createElement('canvas');
   private readonly ctx: CanvasRenderingContext2D;
@@ -126,6 +158,58 @@ export class Overlay {
     this.frames.length = 0;
     this.guides.length = 0;
     this.notes.length = 0;
+    this.traces.length = 0;
+    this.arcs.length = 0;
+  }
+
+  setAnchor(el: Element | null): void {
+    this.dx = 0;
+    this.dy = 0;
+    if (!el) {
+      this.anchor = null;
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    this.anchor = { el, x: r.left + scrollX, y: r.top + scrollY };
+  }
+
+  private drawTrace(t: Trace, scroll: number): void {
+    if (t.alpha <= 0.01) return;
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(t.x, t.y - scroll);
+    ctx.scale(t.scale, t.scale);
+    if (t.pointsAlpha > 0.01) {
+      ctx.globalAlpha = t.alpha * t.pointsAlpha;
+      ctx.fillStyle = `rgb(${LINE})`;
+      const size = 2.2 / t.scale;
+      for (let i = 0; i + 1 < t.points.length; i += 2) {
+        ctx.fillRect((t.points[i] ?? 0) - size / 2, (t.points[i + 1] ?? 0) - size / 2, size, size);
+      }
+    }
+    if (t.p > 0) {
+      ctx.globalAlpha = t.alpha;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = t.width / t.scale;
+      ctx.strokeStyle = t.color;
+      ctx.setLineDash([t.length * t.p, t.length]);
+      ctx.stroke(t.path);
+      ctx.setLineDash([]);
+      // El relleno tapa la mitad interna del trazo y los solapamientos de la fuente variable.
+      ctx.fillStyle = t.cover;
+      ctx.fill(t.path);
+    }
+    ctx.restore();
+  }
+
+  private drawArc(a: Arc, scroll: number): void {
+    if (a.alpha <= 0.01 || a.p <= 0) return;
+    const { ctx } = this;
+    ctx.strokeStyle = `rgba(${LINE}, ${a.alpha * 0.8})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(a.x, a.y - scroll, a.r, a.from, a.from + a.p * Math.PI * 2);
+    ctx.stroke();
   }
 
   /** La flecha con su halo se dibuja una vez por color: rotarla después es solo copiar un bitmap. */
@@ -196,11 +280,21 @@ export class Overlay {
     for (const tether of this.tethers) tether.age += dt;
     while (this.tethers[0] && this.tethers[0].age >= TETHER_LIFE) this.tethers.shift();
     this.drawTethers(anchorX, anchorY, scroll);
+    if (this.anchor) {
+      const r = this.anchor.el.getBoundingClientRect();
+      this.dx = r.left + scrollX - this.anchor.x;
+      this.dy = r.top + scroll - this.anchor.y;
+    }
+    ctx.save();
+    ctx.translate(this.dx, this.dy);
     for (const guide of this.guides) this.drawGuide(guide, scroll);
+    for (const arc of this.arcs) this.drawArc(arc, scroll);
     for (const frame of this.frames) this.drawFrame(frame, scroll);
-    for (const frame of this.hoverFrames) this.drawFrame(frame, scroll);
+    for (const trace of this.traces) this.drawTrace(trace, scroll);
     for (const note of this.notes) this.drawNote(note, scroll);
     this.drawRipples(scroll);
+    ctx.restore();
+    for (const frame of this.hoverFrames) this.drawFrame(frame, scroll);
 
     ctx.globalCompositeOperation = 'lighter';
     for (const agent of agents) this.drawTrail(agent, scroll);
@@ -217,12 +311,14 @@ export class Overlay {
     ctx.lineWidth = 1.1;
     ctx.lineCap = 'round';
     ctx.globalAlpha = a.alpha * (0.34 + 0.2 * a.depth);
+    const ox = a.mode === 'task' ? this.dx : 0;
+    const oy = a.mode === 'task' ? this.dy : 0;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y - scroll);
+    ctx.moveTo(a.x + ox, a.y + oy - scroll);
     for (let i = 0; i < TRAIL; i++) {
       const x = a.trailX[i] ?? a.x;
       const y = a.trailY[i] ?? a.y;
-      ctx.lineTo(x, y - scroll);
+      ctx.lineTo(x + ox, y + oy - scroll);
     }
     ctx.stroke();
     ctx.globalAlpha = 1;
@@ -301,12 +397,14 @@ export class Overlay {
     const size = a.scale * (0.76 + 0.34 * near);
     ctx.save();
     ctx.globalAlpha = a.alpha * (0.5 + 0.5 * near);
-    ctx.translate(a.x, a.y - scroll);
+    const ox = a.mode === 'task' ? this.dx : 0;
+    const oy = a.mode === 'task' ? this.dy : 0;
+    ctx.translate(a.x + ox, a.y + oy - scroll);
     ctx.rotate(a.angle);
     ctx.scale(size, size);
     ctx.drawImage(this.sprite(a.color), -SPRITE_ORIGIN, -SPRITE_ORIGIN, SPRITE_SIZE, SPRITE_SIZE);
     ctx.restore();
-    if (a.tag > 0.01) this.drawChip(a.name, a.x + 12, a.y - scroll + 16, a.alpha * a.tag, a.color, '#0b070a', false);
+    if (a.tag > 0.01) this.drawChip(a.name, a.x + ox + 12, a.y + oy - scroll + 16, a.alpha * a.tag, a.color, '#0b070a', false);
   }
 }
 

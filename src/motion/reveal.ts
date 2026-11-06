@@ -20,6 +20,7 @@ if (matchMedia('(prefers-reduced-motion: no-preference)').matches) {
         if (!entry.isIntersecting) continue;
         const section = entry.target.closest<HTMLElement>('[data-section]');
         if (building() && section && !('built' in section.dataset)) continue;
+        if (building() && entry.target.closest('[data-micro]')) continue;
         entry.target.classList.add('is-in');
         observer.unobserve(entry.target);
       }

@@ -56,7 +56,7 @@ test.describe('primer build', () => {
     await page.goto('/?build=1', { waitUntil: 'commit' });
     await expect(page.locator('.name__off').first()).toHaveCSS('opacity', '1');
     await heroBuilt(page);
-    await expect(page.locator('[data-hud-text]')).toContainText(/\d de \d secciones/);
+    await expect(page.locator('[data-hud-text]')).toContainText(/\d+ de \d+ secciones/);
     await expect(page.locator('.name__lit').first()).toHaveCSS('opacity', '1');
     await expect(page.locator('.lede')).toHaveCSS('opacity', '1');
   });
@@ -190,7 +190,7 @@ test.describe('secciones', () => {
       scrollTo({ top, behavior: 'instant' });
     }, selector);
   const allTyped = (page: Page) =>
-    page.evaluate(() => [...document.querySelectorAll('[data-type]')].every((el) => getComputedStyle(el).opacity === '1'));
+    page.evaluate(() => [...document.querySelectorAll('[data-trace]')].every((el) => getComputedStyle(el).opacity === '1'));
 
   test('recorrido normal: se construye todo e informa un tiempo real', async ({ page }) => {
     await page.goto('/?build=1');
@@ -203,6 +203,45 @@ test.describe('secciones', () => {
     await waitDone(page);
     await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
     expect(await allTyped(page)).toBe(true);
+  });
+
+  // Regresión: limpiar con clearProps 'all' vaciaba el atributo style y mandaba los módulos del sistema a una esquina.
+  // Quedan afuera lo que cambia en uso: el progreso de los puntos de la galería y los trazos del nombre, que terminan en 0.
+  test('los agentes dejan el HTML como estaba: estilos y posiciones', async ({ page }) => {
+    const inlineStyles = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('main [style]:not(.name__stroke, [data-dot], [style=""])')].map((el) => `${el.tagName}|${el.getAttribute('style')}`).sort(),
+      );
+    const stagePositions = () =>
+      page.evaluate(() => {
+        const stage = document.querySelector('.system__stage')!.getBoundingClientRect();
+        return [...document.querySelectorAll('.system__node, .system__link')].map((el) => {
+          const r = el.getBoundingClientRect();
+          return { label: el.textContent, x: Math.round(r.x + r.width / 2 - stage.x), y: Math.round(r.y + r.height / 2 - stage.y) };
+        });
+      });
+
+    await page.goto('/?build=0');
+    const styles = await inlineStyles();
+    const positions = await stagePositions();
+    expect(positions.length).toBeGreaterThan(6);
+
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    const sections = await page.evaluate(() => [...document.querySelectorAll('[data-section]')].map((s) => `[data-section="${(s as HTMLElement).dataset.section}"]`));
+    for (const selector of sections.slice(1)) {
+      await go(page, selector);
+      await page.waitForFunction((sel) => 'built' in (document.querySelector<HTMLElement>(sel)?.dataset ?? {}), selector, { timeout: 8000 });
+    }
+    await waitDone(page);
+
+    expect(await inlineStyles()).toEqual(styles);
+    const after = await stagePositions();
+    for (const [i, before] of positions.entries()) {
+      expect(after[i]?.label).toBe(before.label);
+      expect(Math.abs((after[i]?.x ?? 1e9) - before.x), `${before.label} x`).toBeLessThanOrEqual(2);
+      expect(Math.abs((after[i]?.y ?? 1e9) - before.y), `${before.label} y`).toBeLessThanOrEqual(2);
+    }
   });
 
   test('scroll rápido al final: nada queda colgado y al volver se construye', async ({ page }) => {
@@ -250,7 +289,7 @@ test.describe('secciones', () => {
 });
 
 test.describe('botón "Ver el build completo"', () => {
-  const SECTIONS = ['manifiesto', 'sistema', 'proyectos', 'experiencia', 'capacidades', 'como'];
+  const SECTIONS = ['manifiesto', 'sistema', 'escena', 'proyectos', 'galeria', 'experiencia', 'capacidades', 'como'];
 
   // Registra qué secciones construyó un timeline de verdad y cuántos agentes salieron a trabajar.
   // Se reinicia en cada carga: mide solo lo que pasa después de tocar el botón.

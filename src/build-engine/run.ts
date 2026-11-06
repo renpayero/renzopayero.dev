@@ -3,9 +3,13 @@ import { ui, type Lang, type RoleId } from '../i18n/ui';
 import { getSwarm } from '../swarm/swarm';
 import { Crew } from './agents';
 import { runAutopilot } from './autopilot';
+import { loadAtlas } from './glyphs';
 import type { PlanContext } from './plans/context';
 import { heroPlan } from './plans/hero';
+import { microPlan } from './plans/micro';
 import { sectionPlan } from './plans/section';
+import { systemPlan } from './plans/system';
+import type { Agent } from '../swarm/overlay';
 
 declare global {
   interface Window {
@@ -24,6 +28,7 @@ interface ActiveBuild {
   section: HTMLElement;
   timeline: gsap.core.Timeline;
   cleanups: Array<() => void>;
+  working: Set<Agent>;
   startedAt: number;
   pausedAt: number;
   pausedFor: number;
@@ -48,19 +53,33 @@ class Director {
   private closed = false;
   private idleTimer = 0;
 
-  private readonly trigger = new IntersectionObserver(
-    (entries) => {
+  private readonly onTrigger: IntersectionObserverCallback = (entries) => {
+    for (const entry of entries) {
+      const section = entry.target as HTMLElement;
+      if (entry.isIntersecting) {
+        this.request(section);
+      } else if (this.active?.section === section && entry.boundingClientRect.bottom < 0) {
+        // El visitante ya siguió de largo: esa sección no lo hace esperar.
+        this.complete();
+      }
+    }
+  };
+
+  private readonly trigger = new IntersectionObserver(this.onTrigger, { rootMargin: '0px 0px -30% 0px' });
+  // Las escenas fijas arrancan cuando ya ocupan la pantalla: si no, se construirían fuera de vista.
+  private readonly triggerTop = new IntersectionObserver(this.onTrigger, { rootMargin: '0px 0px -88% 0px' });
+
+  // Filas sueltas: llegan al ritmo del scroll y las construyen los agentes que estén libres.
+  private readonly micros = new Set<gsap.core.Timeline>();
+  private readonly microWatch = new IntersectionObserver(
+    (entries, observer) => {
       for (const entry of entries) {
-        const section = entry.target as HTMLElement;
-        if (entry.isIntersecting) {
-          this.request(section);
-        } else if (this.active?.section === section && entry.boundingClientRect.bottom < 0) {
-          // El visitante ya siguió de largo: esa sección no lo hace esperar.
-          this.complete();
-        }
+        if (!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        this.runMicro(entry.target as HTMLElement);
       }
     },
-    { rootMargin: '0px 0px -30% 0px' },
+    { rootMargin: '0px 0px -24% 0px' },
   );
 
   constructor(private readonly hud: HTMLElement) {
@@ -101,10 +120,14 @@ class Director {
       skip: () => this.complete(),
       skipAll: () => this.skipAll(),
     };
+    // El atlas de vectores no frena al hero: llega antes que la primera sección que lo usa.
+    void loadAtlas().catch(() => undefined);
     void document.fonts.ready.then(() => {
       if (this.closed) return;
       this.run(hero);
-      for (const section of this.sections) this.trigger.observe(section);
+      for (const section of this.sections) {
+        (section.dataset.start === 'top' ? this.triggerTop : this.trigger).observe(section);
+      }
       if ('autopilot' in this.root.dataset) this.startAutopilot();
     });
   }
@@ -116,11 +139,13 @@ class Director {
     });
   }
 
-  private context(cleanups: Array<() => void>): PlanContext {
+  private context(cleanups: Array<() => void>, working: Set<Agent>): PlanContext {
     return {
       overlay: this.swarm.overlay,
       crew: this.crew,
+      working,
       announce: (step) => this.announce(step),
+      vectorsLabel: this.t.hud.vectors,
       onCleanup: (fn) => cleanups.push(fn),
     };
   }
@@ -138,10 +163,14 @@ class Director {
   }
 
   private run(section: HTMLElement): void {
+    this.finishMicros();
     const cleanups: Array<() => void> = [];
-    const ctx = this.context(cleanups);
-    const timeline = section.dataset.section === 'hero' ? heroPlan(section, ctx) : sectionPlan(section, ctx);
-    this.active = { section, timeline, cleanups, startedAt: performance.now(), pausedAt: 0, pausedFor: 0 };
+    const working = new Set<Agent>();
+    const ctx = this.context(cleanups, working);
+    const plan = section.dataset.section === 'hero' ? heroPlan : section.dataset.plan === 'system' ? systemPlan : sectionPlan;
+    const timeline = plan(section, ctx);
+    this.active = { section, timeline, cleanups, working, startedAt: performance.now(), pausedAt: 0, pausedFor: 0 };
+    section.querySelectorAll('[data-micro]').forEach((el) => this.microWatch.observe(el));
     window.clearTimeout(this.idleTimer);
     this.hud.dataset.idle = 'false';
     const index = this.sections.indexOf(section);
@@ -167,7 +196,7 @@ class Director {
     const active = this.active;
     if (!active) return;
     this.active = null;
-    const { section, timeline, cleanups, startedAt, pausedFor } = active;
+    const { section, timeline, cleanups, working, startedAt, pausedFor } = active;
     timeline.eventCallback('onUpdate', null);
     if (ranFull) this.builtSeconds += (performance.now() - startedAt - pausedFor) / 1000;
     this.ranAll &&= ranFull;
@@ -182,7 +211,7 @@ class Director {
       this.remember();
     }
     this.swarm.overlay.clear();
-    for (const agent of this.swarm.agents) this.swarm.release(agent);
+    for (const agent of working) this.swarm.release(agent);
     this.swarm.setBusy(false);
     const index = this.sections.indexOf(section);
     this.segments[index]?.classList.remove('is-active');
@@ -200,6 +229,29 @@ class Director {
   }
 
   private ranAll = true;
+
+  /** Dos agentes libres construyen la fila; si no hay ninguno, entra sola y nadie espera. */
+  private runMicro(row: HTMLElement): void {
+    if (this.closed) return;
+    const busy = this.active?.working;
+    const free = this.swarm.agents.filter((a) => a.mode === 'orbit' && !busy?.has(a)).slice(0, 2);
+    const cleanups: Array<() => void> = [];
+    const working = new Set<Agent>();
+    const timeline = microPlan(row, this.context(cleanups, working), free);
+    this.swarm.start();
+    this.micros.add(timeline);
+    timeline.eventCallback('onComplete', () => {
+      this.micros.delete(timeline);
+      for (const fn of cleanups) fn();
+      for (const agent of working) if (!this.active?.working.has(agent)) this.swarm.release(agent);
+    });
+    timeline.play();
+  }
+
+  /** Antes de que arranque otra sección: los agentes tienen que estar libres para ella. */
+  private finishMicros(): void {
+    for (const timeline of [...this.micros]) timeline.progress(1, false);
+  }
 
   private goIdle(): void {
     const done = this.sections.filter((s) => 'built' in s.dataset).length;
@@ -229,6 +281,7 @@ class Director {
   /** Saltar: toda la página queda en su estado final, sin informar un tiempo que no existió. */
   private skipAll(): void {
     this.queue.length = 0;
+    this.finishMicros();
     this.closed = true;
     const active = this.active;
     if (active) {
@@ -250,6 +303,9 @@ class Director {
     this.closed = true;
     window.clearTimeout(this.idleTimer);
     this.trigger.disconnect();
+    this.triggerTop.disconnect();
+    this.microWatch.disconnect();
+    this.finishMicros();
     removeEventListener('keydown', this.onKey);
     removeEventListener('resize', this.onResize);
     this.root.dataset.build = 'done';

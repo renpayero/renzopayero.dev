@@ -26,20 +26,21 @@ const tiles = await Promise.all(
   })),
 );
 ---
-<section id="proyectos" class="section projects" data-section="proyectos">
+<section id="proyectos" class="section projects">
+  <div data-section="proyectos">
   <div class="wrap">
-    <h2 class="h2" data-type data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
+    <h2 class="h2" data-trace data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
   </div>
 
   {
     lead && (
       <div class="wrap device">
-        <figure class="device__stage" data-device data-frame data-final={finalFrame}>
+        <figure class="device__stage reveal" data-device data-frame data-final={finalFrame}>
           <video src="/video/device-legacy.mp4" poster={startFrame} muted playsinline preload="none" width="1080" height="1080" aria-hidden="true" />
         </figure>
         <div class="device__copy">
           <p class="device__name reveal">{lead.name}</p>
-          <h3 class="device__title reveal" data-frame>{lead.tagline}<br /><span class="tone">{lead.tone}</span></h3>
+          <h3 class="device__title" data-trace data-frame>{lead.tagline}<br /><span class="tone">{lead.tone}</span></h3>
           <p class="body-l device__text reveal">{lead.summary}</p>
           <a class="btn btn--primary reveal" href={`${base}/proyectos/${lead.slug}/`} aria-label={`${t.open}: ${lead.name}`}>{t.open}</a>
         </div>
@@ -47,11 +48,13 @@ const tiles = await Promise.all(
     )
   }
 
-  <div class="gallery" data-gallery role="group" aria-label={t.gallery}>
+  </div>
+
+  <div class="gallery" data-gallery data-section="galeria" role="group" aria-label={t.gallery}>
     <ul class="gallery__track" data-gallery-track tabindex="0">
       {
         tiles.map(({ project, poster }) => (
-          <li class="tile reveal" data-tile data-frame style={`--reveal-y:32px;view-transition-name:media-${project.slug}`}>
+          <li class="tile reveal" data-tile data-frame data-paint style={`--reveal-y:32px;view-transition-name:media-${project.slug}`}>
             <video
               class="tile__video"
               src={`/video/${project.slug}.mp4`}
@@ -151,7 +154,7 @@ const tiles = await Promise.all(
     overflow-x: clip;
   }
 
-  .projects > .wrap {
+  .projects > [data-section] > .wrap {
     padding-inline: clamp(16px, 3vw, 24px);
   }
 

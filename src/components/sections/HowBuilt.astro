@@ -11,14 +11,14 @@ const t = howBuilt[Astro.props.lang];
 <section class="section how" data-section="como">
   <div class="wrap how__layout">
     <div>
-      <h2 class="h2" data-type data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
+      <h2 class="h2" data-trace data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
       <p class="body-l how__text reveal" data-frame>{t.text}</p>
       <button type="button" class="btn btn--primary how__cta reveal" data-autopilot data-js-only>{t.watch}</button>
     </div>
-    <dl class="how__stats reveal" data-frame data-telemetry>
+    <dl class="how__stats" data-telemetry>
       {
         t.metrics.map((metric) => (
-          <div class="how__stat" data-metric={metric.id} hidden>
+          <div class="how__stat reveal" data-metric={metric.id} data-frame data-paint hidden>
             <dt class="how__label">{metric.label}</dt>
             <dd class="how__value" data-value></dd>
           </div>

@@ -17,6 +17,7 @@ CustomEase.create('entrada', '0.28,0.11,0.32,1');
 export function heroPlan(root: HTMLElement, ctx: PlanContext): gsap.core.Timeline {
   const { overlay, crew, announce } = ctx;
   const tl = gsap.timeline({ paused: true, defaults: { overwrite: false } });
+  for (const agent of crew.all) ctx.working.add(agent);
 
   const nameEl = need(root, '[data-b="name"]');
   const nav = need(document, '[data-b="nav"]');

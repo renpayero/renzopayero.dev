@@ -182,8 +182,8 @@
       transform 0.9s var(--ease-entrada);
   }
 
-  /* Texto que un agente va a tipear: oculto solo mientras su sección no se construyó. */
-  :is([data-build='pending'], [data-build='running']) [data-section]:not([data-built]) [data-type] {
+  /* Lo que un agente va a dibujar: oculto solo mientras su sección no se construyó. */
+  :is([data-build='pending'], [data-build='running']) [data-section]:not([data-built]) :is([data-trace], [data-live]) {
     opacity: 0;
   }
 }

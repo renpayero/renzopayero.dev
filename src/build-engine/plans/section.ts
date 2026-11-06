@@ -1,141 +1,189 @@
 import gsap from 'gsap';
-import { SplitText } from 'gsap/SplitText';
-import { comeHome, travel } from '../agents';
+import { comeHome } from '../agents';
 import { contrast, docRect } from '../dom';
-import type { Agent, Frame, Note } from '../../swarm/overlay';
+import { Kit } from '../kit';
+import type { Agent } from '../../swarm/overlay';
 import type { PlanContext } from './context';
 
 const MAX_FRAMES = 7;
 
+const visible = (el: Element): boolean => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.top < innerHeight * 1.05;
+};
+
+const team = (crew: PlanContext['crew'], role: Parameters<PlanContext['crew']['pick']>[0], n = 4): Agent[] =>
+  Array.from({ length: Math.min(n, crew.count(role)) }, (_, i) => crew.pick(role, i));
+
 /**
- * Plan genérico de una sección, en el mismo orden que una entrega: medir, escribir, diseñar,
- * verificar y publicar. Solo toca lo que está por entrar en pantalla: lo demás lo revela el scroll.
+ * Plan de una sección, en el orden de una entrega: medir, trazar la estructura, calcular y dibujar
+ * los vectores de los titulares, pintar, verificar y publicar. Sale todo el equipo, cada uno con su tarea.
  */
 export function sectionPlan(section: HTMLElement, ctx: PlanContext): gsap.core.Timeline {
-  const { overlay, crew, announce, onCleanup } = ctx;
+  const { crew, announce } = ctx;
   const tl = gsap.timeline({ paused: true });
-  const near = (el: Element): boolean => el.getBoundingClientRect().top < innerHeight * 1.05;
+  const kit = new Kit(tl, ctx);
 
-  // Solo sale de la órbita quien tiene trabajo: el resto sigue con el cursor.
-  const working = new Set<Agent>();
-  const summon = (agent: Agent): Agent => {
-    working.add(agent);
-    return agent;
-  };
+  const surveyors = team(crew, 'relevamiento');
+  const architects = team(crew, 'arquitectura');
+  const developers = team(crew, 'desarrollo');
+  const designers = team(crew, 'diseno');
+  const reviewers = team(crew, 'qa');
+  const deploy = crew.pick('deploy', 0);
 
-  // Relevamiento
+  const painted = [...section.querySelectorAll<HTMLElement>('[data-paint]')].filter(visible);
+  const inside = (el: Element): boolean => painted.some((tile) => tile.contains(el));
+  const traced = [...section.querySelectorAll<HTMLElement>('[data-trace]')].filter((el) => visible(el) && !inside(el));
+  const measured = [...section.querySelectorAll('[data-frame]')].filter(visible).slice(0, MAX_FRAMES);
+  const reveals = [...section.querySelectorAll<HTMLElement>('.reveal')].filter(
+    (el) => visible(el) && !el.hasAttribute('data-paint') && !inside(el),
+  );
+
+  // Relevamiento: mide lo que hay en la página real.
   tl.call(() => announce('relevamiento'), undefined, 0);
-  const lead = summon(crew.pick('relevamiento', 0));
-  tl.to(lead, { tag: 1, duration: 0.14 }, 0.08);
-  const measured = [...section.querySelectorAll('[data-frame]')].filter(near).slice(0, MAX_FRAMES);
-  const frames = new Map<Element, Frame>();
+  const frames = new Map<Element, ReturnType<Kit['frame']>['frame']>();
   measured.forEach((el, i) => {
-    const r = docRect(el);
-    const frame: Frame = { ...r, grow: 0, alpha: 1, chip: 0, label: `${Math.round(r.w)} × ${Math.round(r.h)}` };
-    overlay.frames.push(frame);
-    frames.set(el, frame);
-    const at = 0.22 + i * 0.09;
-    const agent = summon(crew.pick('relevamiento', i));
-    travel(tl, crew, agent, r.x, r.y, at - 0.2, 0.2);
-    tl.to(agent, { x: r.x + r.w, y: r.y + r.h, duration: 0.26, ease: 'power2.inOut' }, at);
-    tl.to(frame, { grow: 1, duration: 0.26, ease: 'power2.inOut' }, at);
-    tl.to(frame, { chip: 1, duration: 0.12 }, at + 0.2);
+    const agent = surveyors[i % surveyors.length];
+    if (agent) frames.set(el, kit.frame(el, 0.2 + i * 0.07, agent, i < 4).frame);
   });
-
+  if (surveyors[0]) kit.spotlight(surveyors[0], 0.08);
   const release = (el: Element, at: number): void => {
     const frame = frames.get(el);
-    if (frame) tl.to(frame, { alpha: 0, duration: 0.28, ease: 'power1.out' }, at);
+    if (frame) kit.dismiss(frame, at);
   };
 
-  // Desarrollo: tipea los titulares reales.
-  let cursor = 0.5;
-  const typed = [...section.querySelectorAll<HTMLElement>('[data-type]')].filter(near).slice(0, 2);
-  if (typed.length) tl.call(() => announce('desarrollo'), undefined, cursor);
-  if (typed.length) tl.to(summon(crew.pick('desarrollo', 0)), { tag: 1, duration: 0.14 }, cursor);
-  tl.to(lead, { tag: 0, duration: 0.14 }, cursor);
-  typed.forEach((el, n) => {
-    const split = SplitText.create(el, { type: 'words,chars', aria: 'none' });
-    onCleanup(() => {
-      split.revert();
-      gsap.set(el, { clearProps: 'all' });
-    });
-    gsap.set(el, { opacity: 1 });
-    gsap.set(split.chars, { opacity: 0 });
-    const typist = summon(crew.pick('desarrollo', n));
-    const span = gsap.utils.clamp(0.35, 0.8, split.chars.length * 0.014);
-    const first = split.chars[0];
-    if (first) {
-      const r = docRect(first);
-      travel(tl, crew, typist, r.x, r.y + r.h, cursor - 0.2, 0.2);
-    }
-    split.chars.forEach((char, i) => {
-      const at = cursor + span * (i / split.chars.length) ** 0.9;
-      const r = docRect(char);
-      tl.set(char, { opacity: 1 }, at);
-      tl.set(typist, { x: r.x + r.w, y: r.y + r.h }, at);
-    });
-    release(el, cursor + span * 0.5);
-    cursor += span * 0.8;
-  });
+  // Arquitectura: la grilla sale del layout real y queda a la vista mientras se construye.
+  const wrap = section.querySelector('.wrap') ?? section;
+  const box = docRect(wrap);
+  const top = scrollY;
+  const bottom = scrollY + innerHeight;
+  const anchor = traced[0] ?? measured[0];
+  const anchorBox = anchor ? docRect(anchor) : box;
+  tl.call(() => announce('arquitectura'), undefined, 0.3);
+  if (architects[0]) kit.spotlight(architects[0], 0.3);
+  kit.guide({ x1: box.x, y1: top, x2: box.x, y2: bottom }, 0.3, architects[0] ?? null);
+  kit.guide({ x1: box.x + box.w, y1: bottom, x2: box.x + box.w, y2: top }, 0.36, architects[1] ?? null);
+  kit.guide({ x1: 0, y1: anchorBox.y, x2: innerWidth, y2: anchorBox.y }, 0.44, null);
 
-  // Diseño: entregan los bloques, y la transición es la de Apple (CSS), no un tween.
-  cursor = Math.max(cursor, 0.74);
-  tl.call(() => announce('diseno'), undefined, cursor);
-  tl.to(summon(crew.pick('diseno', 0)), { tag: 1, duration: 0.14 }, cursor);
-  if (typed.length) tl.to(crew.pick('desarrollo', 0), { tag: 0, duration: 0.14 }, cursor);
-  const reveals = [...section.querySelectorAll<HTMLElement>('.reveal')].filter(near);
+  // Desarrollo: calcula y dibuja los vectores de cada titular.
+  let cursor = 0.62;
+  let vectors = 0;
+  let lastTraced: HTMLElement | null = null;
+  if (traced.length) {
+    tl.call(() => announce('desarrollo'), undefined, cursor);
+    if (developers[0]) kit.spotlight(developers[0], cursor);
+  }
+  const liveTraces: ReturnType<Kit['trace']>['traces'] = [];
+  for (const el of traced) {
+    const isLive = Boolean(el.closest('[data-live]'));
+    const result = kit.trace(el, cursor, developers, { paint: !isLive });
+    if (isLive) liveTraces.push(...result.traces);
+    vectors += result.vectors;
+    release(el, result.end - 0.22);
+    cursor = result.end - 0.1;
+    lastTraced = el;
+  }
+  const first = traced[0];
+  if (first && vectors) {
+    const r = docRect(first);
+    kit.note(Math.max(8, Math.min(r.x, innerWidth - 150)), r.y - 22, ctx.vectorsLabel(vectors), 0.72, Math.max(0.5, cursor - 0.9));
+  }
+
+  // Diseño: las tarjetas se pintan desde el cursor del agente; lo demás entra como en Apple.
+  const paintAt = traced.length ? Math.max(0.9, cursor - 0.4) : 0.7;
+  tl.call(() => announce('diseno'), undefined, paintAt);
+  if (designers[0]) kit.spotlight(designers[0], paintAt);
+  let end = paintAt;
+  painted.forEach((tile, i) => {
+    const painter = designers[i % designers.length];
+    if (!painter) return;
+    const r = docRect(tile);
+    const at = paintAt + i * 0.13;
+    const start = kit.go(painter, r.x, r.y, at - 0.14, 0.14);
+    kit.keep([tile]);
+    gsap.set(tile, { transition: 'none', opacity: 1, transform: 'none', clipPath: 'circle(0px at 0px 0px)' });
+    tl.to(tile, { clipPath: `circle(${Math.ceil(Math.hypot(r.w, r.h)) + 2}px at 0px 0px)`, duration: 0.46, ease: 'entrada' }, start);
+    kit.sweep(painter, r.x + r.w, r.y + r.h, start, 0.46, 'power2.out');
+    tl.call(() => tile.classList.add('is-in'), undefined, start + 0.46);
+    release(tile, start + 0.1);
+
+    const title = tile.querySelector<HTMLElement>('[data-trace]');
+    const writer = developers[i % developers.length];
+    if (title && writer) {
+      const result = kit.trace(title, start + 0.12, [writer], { span: 0.3 });
+      end = Math.max(end, result.end);
+    }
+    const chips = [...tile.querySelectorAll<HTMLElement>('li')];
+    if (chips.length) {
+      kit.keep(chips);
+      gsap.set(chips, { opacity: 0, scale: 0.7 });
+      tl.to(chips, { opacity: 1, scale: 1, duration: 0.2, ease: 'back.out(2.2)', stagger: 0.03 }, start + 0.36);
+      const placer = architects[i % architects.length];
+      const chip = chips[chips.length - 1];
+      if (placer && chip) {
+        const c = docRect(chip);
+        kit.go(placer, c.x + c.w / 2, c.y + c.h, start + 0.3, 0.22);
+      }
+      end = Math.max(end, start + 0.36 + chips.length * 0.03 + 0.2);
+    }
+    end = Math.max(end, start + 0.46);
+  });
   reveals.forEach((el, i) => {
     const r = docRect(el);
-    // El siguiente bloque llega antes que el anterior termine: una ola, no una fila.
-    const at = cursor + 0.13 * (1 - 0.9 ** i) * 8;
-    if (i < crew.count('diseno')) {
-      travel(tl, crew, summon(crew.pick('diseno', i)), r.x + r.w * 0.7, r.y + Math.min(r.h, 80), at - 0.18, 0.2);
-    }
+    // El siguiente bloque llega antes de que el anterior termine: una ola, no una fila.
+    const at = paintAt + 0.8 * (1 - 0.88 ** i);
+    const painter = designers[i % designers.length];
+    if (painter) kit.go(painter, r.x + r.w * 0.7, r.y + Math.min(r.h, 80), at - 0.16, 0.16);
     tl.call(() => el.classList.add('is-in'), undefined, at);
     release(el, at);
+    end = Math.max(end, at);
   });
   for (const el of frames.keys()) {
-    if (!el.classList.contains('reveal') && !el.hasAttribute('data-type')) release(el, cursor + 0.3);
+    if (!el.classList.contains('reveal') && !el.hasAttribute('data-trace') && !painted.includes(el as HTMLElement)) release(el, end);
   }
-  const lastReveal = reveals.length ? cursor + 0.13 * (1 - 0.9 ** (reveals.length - 1)) * 8 : cursor;
+  end = Math.max(end, cursor);
 
   // QA: revisa de verdad, con el contraste calculado del DOM.
-  const qaAt = lastReveal + 0.26;
+  const qaAt = end + 0.12;
   tl.call(() => announce('qa'), undefined, qaAt);
-  const checked = typed[0] ?? reveals[0];
-  if (checked) {
+  const checked = lastTraced ?? reveals[0];
+  const reviewer = reviewers[0];
+  if (checked && reviewer) {
     const r = docRect(checked);
-    const note: Note = {
-      x: Math.min(r.x + r.w + 10, innerWidth - 80),
-      y: r.y + 4,
-      alpha: 0,
-      text: `${contrast(checked).toFixed(1)}:1 ok`,
-    };
-    overlay.notes.push(note);
-    travel(tl, crew, summon(crew.pick('qa', 0)), note.x, note.y + 18, qaAt - 0.22, 0.22);
-    tl.to(crew.pick('qa', 0), { tag: 1, duration: 0.14 }, qaAt);
-    tl.to(crew.pick('diseno', 0), { tag: 0, duration: 0.14 }, qaAt);
-    tl.to(note, { alpha: 1, duration: 0.12 }, qaAt + 0.02);
-    tl.to(note, { alpha: 0, duration: 0.2 }, qaAt + 0.42);
+    const x = Math.min(r.x + r.w + 10, innerWidth - 90);
+    kit.go(reviewer, x, r.y + 22, qaAt - 0.18, 0.18);
+    kit.spotlight(reviewer, qaAt);
+    kit.note(x, r.y + 4, `${contrast(checked).toFixed(1)}:1 ok`, qaAt + 0.02, 0.4);
+  }
+  const second = reviewers[1];
+  const lastBlock = reveals[reveals.length - 1] ?? painted[painted.length - 1];
+  if (second && lastBlock) {
+    const r = docRect(lastBlock);
+    kit.go(second, r.x + 12, r.y + r.h, qaAt - 0.1, 0.2);
   }
 
   // Deploy: go-live de la sección. Si tiene neón, arranca con su parpadeo.
-  const liveAt = qaAt + 0.4;
+  const liveAt = qaAt + 0.34;
   tl.call(() => announce('go-live'), undefined, liveAt);
-  const live = [...section.querySelectorAll<HTMLElement>('[data-live]')].filter(near);
+  const live = [...section.querySelectorAll<HTMLElement>('[data-live]')].filter(visible);
+  const center = docRect(live[0] ?? first ?? wrap);
+  kit.go(deploy, center.x + center.w * 0.5, center.y + center.h * 0.6, liveAt - 0.22, 0.22);
+  kit.spotlight(deploy, liveAt - 0.08);
+  kit.ripple(center.x + center.w * 0.5, center.y + center.h * 0.6, liveAt);
   if (live.length) {
-    const r = docRect(live[0] as HTMLElement);
-    const deploy = summon(crew.pick('deploy', 0));
-    travel(tl, crew, deploy, r.x + r.w * 0.5, r.y + r.h * 0.6, liveAt - 0.3, 0.3);
-    tl.to(deploy, { tag: 1, duration: 0.14 }, liveAt - 0.1);
-    gsap.set(live, { opacity: 0.25 });
-    tl.to(live, { keyframes: { opacity: [0.25, 0.85, 0.3, 1, 0.6, 1], easeEach: 'none' }, duration: 0.74, ease: 'none' }, liveAt);
-    onCleanup(() => gsap.set(live, { clearProps: 'all' }));
+    kit.keep(live);
+    gsap.set(live, { opacity: 0 });
+    tl.to(live, { keyframes: { opacity: [0.001, 0.85, 0.3, 1, 0.6, 1], easeEach: 'none' }, duration: 0.74, ease: 'none' }, liveAt);
+    // Lo trazado adentro espera a este momento: se enciende junto con su neón, no al terminar.
+    const litText = live.flatMap((el) => [...el.querySelectorAll<HTMLElement>('[data-trace]')]);
+    if (litText.length) {
+      kit.keep(litText);
+      tl.set(litText, { opacity: 1 }, liveAt);
+    }
+    if (liveTraces.length) tl.to(liveTraces, { alpha: 0, duration: 0.3 }, liveAt + 0.3);
   }
 
   // Vuelven a orbitar el cursor y queda la sección sola.
-  const exitAt = liveAt + (live.length ? 0.5 : 0.12);
-  comeHome(tl, crew, [...working], exitAt);
-
+  comeHome(tl, crew, [...ctx.working], liveAt + (live.length ? 0.62 : 0.14));
   return tl;
 }

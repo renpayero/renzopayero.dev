@@ -139,15 +139,32 @@ export class Swarm {
   /** El motor pide un agente: se despega de la órbita y el timeline pasa a moverlo. */
   borrow(agent: Agent): void {
     if (agent.mode === 'pin') this.endInspection();
-    if (agent.mode !== 'task') this.overlay.tethers.push({ agent, age: 0 });
+    if (agent.mode !== 'task') {
+      this.overlay.tethers.push({ agent, age: 0 });
+      this.shift(agent, -this.overlay.dx, -this.overlay.dy);
+    }
     agent.mode = 'task';
   }
 
   /** Terminó su tarea: la física lo trae de vuelta a su órbita, con la velocidad que traía. */
   release(agent: Agent): void {
+    if (agent.mode === 'task') this.shift(agent, this.overlay.dx, this.overlay.dy);
     agent.mode = 'orbit';
     agent.tag = 0;
     agent.scale = 1;
+  }
+
+  /** Pasa un agente entre las coordenadas de la página y las de la escena fija, sin salto visible. */
+  private shift(agent: Agent, dx: number, dy: number): void {
+    if (dx === 0 && dy === 0) return;
+    agent.x += dx;
+    agent.y += dy;
+    agent.lastX += dx;
+    agent.lastY += dy;
+    for (let i = 0; i < TRAIL; i++) {
+      agent.trailX[i] = (agent.trailX[i] ?? 0) + dx;
+      agent.trailY[i] = (agent.trailY[i] ?? 0) + dy;
+    }
   }
 
   /** Mientras construyen, nadie se distrae inspeccionando lo que toca el cursor. */
