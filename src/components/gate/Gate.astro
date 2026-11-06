@@ -47,22 +47,22 @@ const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#'
             </header>
 
             <div class="gate__boot" aria-hidden="true">
-              <p class="gate__cmd" style="--d:0.06s"><i set:html={caret} /> /effort</p>
-              <p class="gate__out" style="--d:0.12s"><i set:html={elbow} /><span>{t.effortOut}</span></p>
-              <p class="gate__cmd" style="--d:0.2s"><i set:html={caret} /> /model</p>
-              <p class="gate__out" style="--d:0.26s">
+              <p class="gate__cmd" style="--d:0.04s"><i set:html={caret} /> /effort</p>
+              <p class="gate__out" style="--d:0.08s"><i set:html={elbow} /><span>{t.effortOut}</span></p>
+              <p class="gate__cmd" style="--d:0.14s"><i set:html={caret} /> /model</p>
+              <p class="gate__out" style="--d:0.18s">
                 <i set:html={elbow} /><span>{t.modelOut[0]}<span class="gate__model">{MODEL[v]}</span>{t.modelOut[1]}</span>
               </p>
             </div>
 
-            <p class="gate__cmd gate__cmd--typed" style="--d:0.34s">
+            <p class="gate__cmd gate__cmd--typed" style="--d:0.24s">
               <i set:html={caret} />
               <span class="gate__typed" style={`--n:${t.prompt.length}`}>{t.prompt}</span>
               <span class="gate__cursor" aria-hidden="true"></span>
             </p>
-            <p class="gate__reply" style="--d:0.9s"><i class="gate__bullet" set:html={dot} /><span>{t.reply}</span></p>
+            <p class="gate__reply" style="--d:0.58s"><i class="gate__bullet" set:html={dot} /><span>{t.reply}</span></p>
 
-            <div class="gate__ask" data-ask style="--d:0.98s">
+            <div class="gate__ask" data-ask style="--d:0.64s">
               <p class="gate__tabs" aria-hidden="true">
                 <span data-tab="build"><i class="is-box" set:html={box} /><i class="is-check" set:html={check} />{t.tabs.build}</span>
                 <span data-tab="lang"><i class="is-box" set:html={box} /><i class="is-check" set:html={check} />{t.tabs.lang}</span>
@@ -173,9 +173,14 @@ const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#'
   }
 
   /* El script del head la abre antes del primer pintado: la terminal es lo primero que se ve. */
-  html[data-gate] {
+  html[data-gate]:not([data-gate-leaving]) {
     overflow: hidden;
     scrollbar-gutter: stable;
+  }
+
+  /* Lo de atrás no se pinta hasta que se elija: la página sigue en el DOM, lista para arrancar. */
+  html[data-gate]:not([data-gate-leaving]) body > :not(.gate, canvas) {
+    visibility: hidden;
   }
 
   html[data-gate] .gate {
@@ -198,7 +203,7 @@ const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#'
     pointer-events: none;
   }
 
-  html[data-gate] :is(.hud, .hud-replay, [data-swarm-toggle]) {
+  html[data-gate]:not([data-gate-leaving]) :is(.hud, .hud-replay, [data-swarm-toggle]) {
     display: none !important;
   }
 
@@ -307,7 +312,7 @@ const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#'
     display: inline-block;
     overflow: hidden;
     white-space: nowrap;
-    animation: gate-type 0.5s steps(var(--n)) 0.34s both;
+    animation: gate-type 0.32s steps(var(--n)) 0.24s both;
   }
 
   @keyframes gate-type {
@@ -325,7 +330,7 @@ const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#'
     width: 0.55em;
     height: 1.1em;
     background: var(--color-text);
-    animation: gate-gone 0s linear 0.9s both;
+    animation: gate-gone 0s linear 0.58s both;
   }
 
   [data-fast] .gate__cursor {

@@ -41,6 +41,7 @@ test.describe('la terminal de inicio', () => {
     await expect(page.locator('.hud')).toBeHidden();
     await expect(page.locator('[data-swarm-toggle]')).toBeHidden();
     expect(await page.locator('main').evaluate((el) => el.closest('[inert]') !== null)).toBe(true);
+    await expect(page.locator('main')).toBeHidden();
     await page.mouse.wheel(0, 600);
     await page.waitForTimeout(150);
     expect(await page.evaluate(() => scrollY)).toBe(0);
@@ -66,6 +67,9 @@ test.describe('la terminal de inicio', () => {
 
     await page.waitForFunction(() => document.documentElement.dataset.build === 'running', undefined, { timeout: 5000 });
     expect(await page.evaluate(() => document.documentElement.dataset.pilot)).toBe('present');
+    // La terminal se funde: mientras se va todavía está, y debajo ya se construye.
+    await expect(page.locator('[data-gate-root]')).toHaveClass(/is-leaving/);
+    await expect.poll(() => page.locator('[data-gate-root]').evaluate((el) => getComputedStyle(el).display).catch(() => 'gone')).not.toBe('none');
     await expect(page.locator('[data-gate-root]')).toHaveCount(0);
     await expect(page.locator('.hud')).toBeVisible();
     await heroBuilt(page);
@@ -161,7 +165,7 @@ test.describe('idioma de la terminal', () => {
       await option(page, other).click();
       await page.waitForURL(goes, { timeout: 5000 });
       await page.waitForFunction(() => document.documentElement.dataset.build === 'running', undefined, { timeout: 8000 });
-      expect(await gateState(page)).toBeNull();
+      await expect.poll(() => gateState(page)).toBeNull();
       expect(await page.evaluate(() => document.documentElement.dataset.pilot)).toBe('present');
       await context.close();
     });

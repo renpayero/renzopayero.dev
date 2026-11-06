@@ -6,7 +6,7 @@ const BUILT_KEY = 'rp-built';
 const LOG_MS = 950;
 const QUICK_MS = 260;
 const WATCHDOG_MS = 3500;
-const INTRO_MS = 1050;
+const INTRO_MS = 680;
 
 const root = document.documentElement;
 const pageLang: Lang = root.lang === 'en' ? 'en' : 'es';
@@ -62,10 +62,14 @@ function open(gate: HTMLElement, screen: HTMLElement): void {
   /** La terminal se funde y la página sigue debajo, sin saltos. */
   const close = (): void => {
     for (const el of behind) el.inert = false;
+    root.dataset.gateLeaving = '';
     gate.classList.add('is-leaving');
-    delete root.dataset.gate;
-    delete root.dataset.gateReady;
-    const remove = (): void => gate.remove();
+    const remove = (): void => {
+      gate.remove();
+      delete root.dataset.gate;
+      delete root.dataset.gateLeaving;
+      delete root.dataset.gateReady;
+    };
     gate.addEventListener('transitionend', remove, { once: true });
     setTimeout(remove, 500);
   };
