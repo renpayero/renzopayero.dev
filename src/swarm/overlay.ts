@@ -15,6 +15,8 @@ export interface Agent {
   y: number;
   vx: number;
   vy: number;
+  lastX: number;
+  lastY: number;
   angle: number;
   alpha: number;
   scale: number;

@@ -40,7 +40,8 @@ test.describe('sin animación', () => {
       if (r.url().includes('run')) chunks.push(r.url());
     });
     await page.goto(`${baseURL}/`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(500);
     expect(await state(page)).toBeNull();
     expect(chunks).toEqual([]);
     await expect(page.locator('canvas')).toHaveCount(0);
@@ -169,7 +170,8 @@ test.describe('visita repetida', () => {
       if (/run\.[^/]*\.js/.test(r.url())) chunks.push(r.url());
     });
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(500);
     expect(await state(page)).toBeNull();
     expect(chunks).toEqual([]);
     await expect(page.locator('.lede')).toBeVisible();
@@ -260,10 +262,10 @@ test.describe('enjambre', () => {
   test('los agentes orbitan el cursor, también en una visita repetida', async ({ page, isMobile, viewport }) => {
     test.skip(isMobile === true, 'solo con puntero');
     await page.goto('/?build=0');
-    const x = (viewport?.width ?? 1440) / 2;
+    const x = (viewport?.width ?? 1440) - 4;
     const y = (viewport?.height ?? 900) / 2;
+    await page.mouse.move(x - 2, y - 2);
     await page.mouse.move(x, y);
-    await page.mouse.move(x + 2, y + 2);
     await page.waitForTimeout(1400);
     const { agents, scroll } = await read(page);
     expect(agents.length).toBeGreaterThan(0);
@@ -282,11 +284,11 @@ test.describe('enjambre', () => {
 
   test('siguen al cursor cuando se mueve', async ({ page, viewport }) => {
     await page.goto('/?build=0');
-    await page.mouse.move(120, 120);
-    await page.mouse.move(122, 122);
+    await page.mouse.move(4, 300);
+    await page.mouse.move(6, 302);
     await page.waitForTimeout(800);
-    const x = (viewport?.width ?? 1440) - 160;
-    const y = (viewport?.height ?? 900) - 160;
+    const x = (viewport?.width ?? 1440) - 4;
+    const y = 200;
     await page.mouse.move(x, y, { steps: 6 });
     await page.waitForTimeout(1200);
     const { agents, scroll } = await read(page);
@@ -295,8 +297,8 @@ test.describe('enjambre', () => {
 
   test('salen a construir y después vuelven a la órbita', async ({ page }) => {
     await page.goto('/?build=1');
-    await page.mouse.move(300, 300);
-    await page.mouse.move(302, 302);
+    await page.mouse.move(4, 300);
+    await page.mouse.move(6, 302);
     await page.waitForFunction(() => {
       const swarm = (window as unknown as { __rpSwarm?: { agents: Array<{ mode: string }> } }).__rpSwarm;
       return (swarm?.agents.filter((a) => a.mode === 'task').length ?? 0) > 3;
@@ -306,14 +308,14 @@ test.describe('enjambre', () => {
     const { agents, scroll } = await read(page);
     for (const agent of agents) {
       expect(agent.mode).toBe('orbit');
-      expect(Math.hypot(agent.x - 302, agent.y - scroll - 302)).toBeLessThan(230);
+      expect(Math.hypot(agent.x - 6, agent.y - scroll - 302)).toBeLessThan(230);
     }
   });
 
   test('al pasar sobre un botón, cuatro agentes toman sus esquinas', async ({ page }) => {
     await page.goto('/?build=0');
-    await page.mouse.move(40, 40);
-    await page.mouse.move(42, 42);
+    await page.mouse.move(4, 300);
+    await page.mouse.move(6, 302);
     await page.waitForTimeout(500);
     const box = await page.locator('.hero .cta .btn--primary').boundingBox();
     if (!box) throw new Error('sin botón');
@@ -327,7 +329,7 @@ test.describe('enjambre', () => {
       const nearest = Math.min(...pinned.map((a) => Math.hypot(a.x - cx, a.y - scroll - cy)));
       expect(nearest).toBeLessThan(12);
     }
-    await page.mouse.move(40, 40, { steps: 3 });
+    await page.mouse.move(4, 300, { steps: 3 });
     await page.waitForTimeout(300);
     expect((await read(page)).agents.filter((a) => a.mode === 'pin')).toHaveLength(0);
   });

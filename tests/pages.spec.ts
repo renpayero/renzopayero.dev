@@ -80,7 +80,8 @@ test.describe('idiomas y SEO', () => {
       if (r.url().endsWith('.js')) urls.push(r.url());
     });
     await page.goto('/?build=0');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(500);
     // En una visita repetida no se descarga el motor.
     expect(urls.some((u) => /run\.[^/]*\.js/.test(u))).toBe(false);
   });

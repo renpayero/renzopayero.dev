@@ -28,6 +28,7 @@ const SHELLS = [
 
 const TIP_HEADING = -2.09; // la flecha apunta arriba a la izquierda
 const MAX_SPEED = 2600;
+const STEP = 1 / 60;
 const INSPECTABLE = 'a, button, [data-tile], .bento__tile, .portrait';
 const seconds = (ms: number): number => ms / 1000;
 
@@ -104,6 +105,8 @@ export class Swarm {
           tilt: shell.tilt,
           spin: shell.spin,
           stiffness: 70 + this.random() * 70,
+          lastX: x,
+          lastY: y,
           pinX: 0,
           pinY: 0,
           aimX: 0,
@@ -294,14 +297,30 @@ export class Swarm {
   }
 
   private readonly tick = (now: number): void => {
-    const dt = Math.min(seconds(now - this.lastFrame), 1 / 30);
+    // Subpasos fijos: la órbita corre al mismo tiempo real en 165 Hz que en un equipo a 15 cuadros.
+    const dt = Math.min(seconds(now - this.lastFrame), 0.25);
     this.lastFrame = now;
     this.time += dt;
-    this.update(dt, now);
+    this.trackTasks(dt);
+    for (let rest = dt; rest > 1e-5; rest -= STEP) this.update(Math.min(rest, STEP), now);
     this.aura += ((this.hasPointer && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
     this.overlay.render(this.agents, this.pointerX, this.pointerY, this.aura * (0.8 + this.energy * 0.4), dt);
     requestAnimationFrame(this.tick);
   };
+
+  /** Al agente en tarea lo mueve el timeline: su velocidad se deduce de cuánto se movió en el cuadro. */
+  private trackTasks(dt: number): void {
+    if (dt <= 0) return;
+    for (const agent of this.agents) {
+      if (agent.mode === 'task') {
+        const blend = 1 - Math.exp(-22 * dt);
+        agent.vx += ((agent.x - agent.lastX) / dt - agent.vx) * blend;
+        agent.vy += ((agent.y - agent.lastY) / dt - agent.vy) * blend;
+      }
+      agent.lastX = agent.x;
+      agent.lastY = agent.y;
+    }
+  }
 
   private update(dt: number, now: number): void {
     // La velocidad del cursor le da energía a la órbita: se abre al moverse y respira al frenar.
@@ -321,12 +340,9 @@ export class Swarm {
     const rest = this.hasPointer ? 1 : 0;
 
     for (const agent of this.agents) {
-      const px = agent.x;
-      const py = agent.y;
       if (agent.mode === 'task') {
         agent.alpha += (1 - agent.alpha) * (1 - Math.exp(-16 * dt));
-        agent.vx = (agent.x - px) / dt;
-        agent.vy = (agent.y - py) / dt;
+        agent.depth += (0 - agent.depth) * (1 - Math.exp(-10 * dt));
       } else {
         if (agent.mode === 'orbit' && scrolled !== 0) {
           agent.y += scrolled;
