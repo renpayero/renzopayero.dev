@@ -88,6 +88,78 @@
     font-family: var(--font-mono);
     font-size: 0.75rem;
   }
+
+  /* Compartidos entre la home y las páginas de caso. */
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: clamp(20px, 3.4svh, 36px);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding-inline: 20px;
+    border: 1px solid rgb(245 242 244 / 0.24);
+    border-radius: 980px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      background-color 0.32s var(--ease-apple),
+      border-color 0.32s var(--ease-apple),
+      transform 0.16s var(--ease-apple);
+  }
+
+  .btn:hover {
+    border-color: var(--color-text);
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn--primary {
+    border-color: transparent;
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+
+  .btn--primary:hover {
+    border-color: transparent;
+    background: #fff;
+  }
+
+  .tile__badge {
+    padding: 4px 10px;
+    border-radius: 980px;
+    background: var(--color-odoo);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .tone-light {
+    color: rgb(245 242 244 / 0.66);
+  }
+
+  .bento__items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 12px;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .bento__items li {
+    padding: 5px 10px;
+    border-radius: 980px;
+    background: rgb(245 242 244 / 0.1);
+  }
 }
 
 /*

@@ -9,6 +9,9 @@ services:
     ports:
       - "${PORT:-8080}:8080"
     restart: unless-stopped
+    # Sirve archivos y nada más: la red por defecto alcanza y no consume un rango del host.
+    # Detrás de un proxy (Nginx Proxy Manager, Caddy) reemplazar por la red del proxy.
+    network_mode: bridge
     # Solo sirve archivos: sistema de archivos de solo lectura y sin privilegios de más.
     read_only: true
     tmpfs:
