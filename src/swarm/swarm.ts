@@ -1,20 +1,6 @@
 import { ui, type Lang, type RoleId } from '../i18n/ui';
+import { COLORS, crewFor } from './crew';
 import { Overlay, RIPPLE_LIFE, TRAIL, type Agent, type Frame } from './overlay';
-
-/** Colores oficiales de Odoo más los neutros del sitio. */
-const COLORS: Record<RoleId, string> = {
-  relevamiento: '#d08bbd',
-  arquitectura: '#f5f2f4',
-  desarrollo: '#e4a900',
-  diseno: '#e46e78',
-  qa: '#8f8f8f',
-  deploy: '#f7d4ee',
-};
-
-const CREW: Record<'desktop' | 'mobile', Record<RoleId, number>> = {
-  desktop: { relevamiento: 3, arquitectura: 2, desarrollo: 4, diseno: 2, qa: 2, deploy: 1 },
-  mobile: { relevamiento: 3, arquitectura: 1, desarrollo: 3, diseno: 1, qa: 1, deploy: 1 },
-};
 
 /**
  * Tres capas inclinadas en 3D, como un átomo. Velocidades distintas y un sentido invertido:
@@ -78,7 +64,7 @@ export class Swarm {
 
   constructor() {
     const lang: Lang = document.documentElement.lang === 'en' ? 'en' : 'es';
-    const crew = CREW[innerWidth < 768 ? 'mobile' : 'desktop'];
+    const crew = crewFor(innerWidth);
     const roles = Object.keys(crew) as RoleId[];
     let index = 0;
     for (const role of roles) {
@@ -181,6 +167,28 @@ export class Swarm {
     this.orbitVisible = visible && this.hasPointer;
     if (!this.orbitVisible) this.endInspection();
     this.start();
+  }
+
+  /** Se reportan en estos puntos antes de salir a construir: apuntan a su línea en la terminal. */
+  assemble(spots: ReadonlyArray<{ x: number; y: number }>): void {
+    this.setBusy(true);
+    this.agents.forEach((agent, i) => {
+      const spot = spots[i];
+      if (!spot) return;
+      agent.mode = 'pin';
+      agent.pinX = spot.x;
+      agent.pinY = spot.y + scrollY;
+      agent.aimX = spot.x - 200;
+      agent.aimY = agent.pinY;
+    });
+  }
+
+  /** Rompen filas: el que no tenga tarea vuelve a orbitar. */
+  disperse(): void {
+    for (const agent of this.agents) {
+      if (agent.mode === 'pin') agent.mode = 'orbit';
+    }
+    this.setBusy(false);
   }
 
   /** Toda la página construida: la órbita se abre de golpe y vuelve a respirar. */
@@ -409,7 +417,7 @@ export class Swarm {
         }
         agent.x += agent.vx * dt;
         agent.y += agent.vy * dt;
-        agent.alpha += (rest - agent.alpha) * (1 - Math.exp(-8 * dt));
+        agent.alpha += ((agent.mode === 'pin' ? 1 : rest) - agent.alpha) * (1 - Math.exp(-8 * dt));
       }
 
       // La flecha mira hacia donde va; cuando trabaja vuelve a ser un cursor; en una esquina apunta al objeto.

@@ -12,13 +12,24 @@ La página se construye sola, como se entrega un proyecto real: un equipo de age
 | `npm test` | Matriz de pruebas (Playwright): Chromium, Firefox y WebKit a varios anchos |
 | `docker compose up -d --build` | Imagen de producción en `localhost:8080` |
 
-Parámetros útiles en la URL: `?build=1` fuerza el build y `?build=0` muestra la página final.
+Parámetros útiles en la URL, todos saltean la terminal de inicio:
+
+| Parámetro | Qué hace |
+|---|---|
+| `?build=present` | Modo presentación: construye y baja sola, con tiempo para leer y sin quedarse quieta nunca |
+| `?build=full` | El build completo con ritmo de reel. Es lo que lanza el botón "Ver el build completo" |
+| `?build=1` | Construye al llegar con el scroll |
+| `?build=0` | La página final, sin construcción |
+
+La terminal aparece en la primera visita a la portada (y otra vez después de 7 días). Para volver a verla, borrá `rp-built` del `localStorage`.
 
 ## Cómo está armado
 
 - **Contenido real en el HTML.** Astro genera todo estático. Sin JS o con `prefers-reduced-motion` se ve la página final; la animación es una capa encima.
 - **`src/swarm/`: el enjambre.** Física de órbita en 3D, inspección de elementos y canvas. Sin dependencias: se carga también en visitas repetidas.
 - **`src/build-engine/`: el motor de build.** Timelines de GSAP por sección, que piden agentes prestados al enjambre. Solo se descarga en la primera visita.
+- **`src/components/gate/` y `src/gate/`: la terminal de inicio.** El texto viene en el HTML y un script del `<head>` la abre antes del primer pintado. El agente y el modelo están en `src/i18n/gate.ts`, sin versión a propósito.
+- **`src/build-engine/autopilot.ts`: el recorrido solo.** El ritmo de la presentación son las constantes del principio del archivo.
 - **`src/motion/`: el movimiento de la página.** Revelado por clase a 70vh, galería, telemetría. Las escenas atadas al scroll son CSS scroll-driven: corren sin JS y fuera del hilo principal.
 - **`integrations/`:** datos reales del build para "Cómo se hizo" y CSP con el hash exacto de cada script inline.
 

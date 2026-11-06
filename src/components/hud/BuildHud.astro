@@ -35,7 +35,10 @@ const t = ui[lang].hud;
   const root = document.documentElement;
   const hud = document.querySelector<HTMLElement>('[data-hud]');
   if (root.dataset.build === 'pending' && hud) {
-    import('../../build-engine/run').then((engine) => engine.start());
+    const engine = import('../../build-engine/run');
+    const go = (): void => void engine.then((module) => module.start());
+    if ('gate' in root.dataset) addEventListener('rp:launch', go, { once: true });
+    else go();
   }
 
   // El build completo siempre arranca de cero: para llegar a este botón ya se construyó lo anterior.

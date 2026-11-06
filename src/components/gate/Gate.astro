@@ -1,0 +1,581 @@
+---
+import caret from '@phosphor-icons/core/assets/bold/caret-right-bold.svg?raw';
+import elbow from '@phosphor-icons/core/assets/bold/arrow-elbow-down-right-bold.svg?raw';
+import box from '@phosphor-icons/core/assets/bold/square-bold.svg?raw';
+import check from '@phosphor-icons/core/assets/bold/check-bold.svg?raw';
+import diamond from '@phosphor-icons/core/assets/bold/diamond-bold.svg?raw';
+import arrows from '@phosphor-icons/core/assets/fill/caret-double-right-fill.svg?raw';
+import dot from '@phosphor-icons/core/assets/fill/circle-fill.svg?raw';
+import { AGENT, EFFORT, MODEL, PATH, gateText } from '../../i18n/gate';
+import type { Lang, RoleId } from '../../i18n/ui';
+import { COLORS, CREW, crewSize } from '../../swarm/crew';
+import CrewCount from './CrewCount.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+// En la raíz el visitante todavía no eligió idioma: la terminal le habla en el de su navegador.
+const screens: Lang[] = lang === 'en' ? ['en'] : ['es', 'en'];
+const roles = Object.keys(CREW.desktop) as RoleId[];
+const sizes = { desktop: crewSize(CREW.desktop), mobile: crewSize(CREW.mobile) };
+const parts = (text: string): string[] => text.split('{n}');
+// Letra R de 5 × 7 píxeles, con tres agentes alrededor: la marca del sitio, no la de nadie más.
+const R = ['#### ', '#   #', '#   #', '#### ', '# #  ', '#  # ', '#   #'];
+const pixels = R.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === '#' ? [{ x, y }] : [])));
+---
+<div class="gate" data-gate-root>
+  {
+    screens.map((v) => {
+      const t = gateText[v];
+      return (
+        <div class="gate__screen" data-screen={v} lang={v} role="dialog" aria-modal="true" aria-label={t.label}>
+          <div class="gate__main">
+            <header class="gate__head">
+              <svg class="gate__mark" viewBox="0 0 9 7" shape-rendering="crispEdges" aria-hidden="true">
+                {pixels.map((p) => <rect x={p.x} y={p.y} width="1" height="1" fill="var(--color-ciruela-claro)" />)}
+                <rect x="7" y="0" width="1" height="1" fill={COLORS.desarrollo} />
+                <rect x="8" y="2" width="1" height="1" fill={COLORS.diseno} />
+                <rect x="7" y="4" width="1" height="1" fill={COLORS.arquitectura} />
+              </svg>
+              <div>
+                <p class="gate__agent">{AGENT}</p>
+                <p class="gate__dim"><span class="gate__model">{MODEL[v]}</span> {EFFORT}</p>
+                <p class="gate__dim">{PATH}</p>
+              </div>
+            </header>
+
+            <div class="gate__boot" aria-hidden="true">
+              <p class="gate__cmd" style="--d:0.06s"><i set:html={caret} /> /effort</p>
+              <p class="gate__out" style="--d:0.12s"><i set:html={elbow} /><span>{t.effortOut}</span></p>
+              <p class="gate__cmd" style="--d:0.2s"><i set:html={caret} /> /model</p>
+              <p class="gate__out" style="--d:0.26s">
+                <i set:html={elbow} /><span>{t.modelOut[0]}<span class="gate__model">{MODEL[v]}</span>{t.modelOut[1]}</span>
+              </p>
+            </div>
+
+            <p class="gate__cmd gate__cmd--typed" style="--d:0.34s">
+              <i set:html={caret} />
+              <span class="gate__typed" style={`--n:${t.prompt.length}`}>{t.prompt}</span>
+              <span class="gate__cursor" aria-hidden="true"></span>
+            </p>
+            <p class="gate__reply" style="--d:0.9s"><i class="gate__bullet" set:html={dot} /><span>{t.reply}</span></p>
+
+            <div class="gate__ask" data-ask style="--d:0.98s">
+              <p class="gate__tabs" aria-hidden="true">
+                <span data-tab="build"><i class="is-box" set:html={box} /><i class="is-check" set:html={check} />{t.tabs.build}</span>
+                <span data-tab="lang"><i class="is-box" set:html={box} /><i class="is-check" set:html={check} />{t.tabs.lang}</span>
+                <span data-tab="launch"><i class="is-check" set:html={check} />{t.tabs.launch}</span>
+              </p>
+
+              <div data-step="build">
+                <p class="gate__q" id={`gate-q-build-${v}`}>{t.build.question}</p>
+                <div role="group" aria-labelledby={`gate-q-build-${v}`}>
+                  {
+                    t.build.options.map((o, i) => (
+                      <button type="button" class="gate__opt" data-value={o.value}>
+                        <i class="gate__pointer" set:html={caret} />
+                        <span class="gate__n">{i + 1}.</span>
+                        <span class="gate__label">{o.label}{o.note && <em> {o.note}</em>}</span>
+                        <span class="gate__desc">
+                          {parts(o.desc).map((part, j) => (
+                            <>
+                              {j > 0 && <CrewCount desktop={sizes.desktop} mobile={sizes.mobile} />}
+                              {part}
+                            </>
+                          ))}
+                        </span>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              <div data-step="lang" hidden>
+                <p class="gate__q" id={`gate-q-lang-${v}`}>{t.language.question}</p>
+                <div role="group" aria-labelledby={`gate-q-lang-${v}`}>
+                  {
+                    t.language.options.map((o, i) => (
+                      <button type="button" class="gate__opt" data-value={o.value} lang={o.value}>
+                        <i class="gate__pointer" set:html={caret} />
+                        <span class="gate__n">{i + 1}.</span>
+                        <span class="gate__label">{o.label}{o.note && <em lang={v}> {o.note}</em>}</span>
+                        <span class="gate__desc">{o.desc}</span>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              <p class="gate__hint gate__hint--keys">{t.hint}</p>
+              <p class="gate__hint gate__hint--touch">{t.hintTouch}</p>
+            </div>
+
+            <div class="gate__log" data-log hidden role="status">
+              {
+                (['present', 'manual', 'final'] as const).map((mode) => (
+                  <p class="gate__reply" data-log-title={mode} hidden>
+                    <i class="gate__bullet" set:html={dot} />
+                    <span>
+                      {parts(t.log[mode]).map((part, j) => (
+                        <>
+                          {j > 0 && <CrewCount desktop={sizes.desktop} mobile={sizes.mobile} />}
+                          {part}
+                        </>
+                      ))}
+                    </span>
+                  </p>
+                ))
+              }
+              <ul class="gate__roster" data-roster>
+                {
+                  roles.map((role, i) => (
+                    <li style={`--i:${i};--c:${COLORS[role]}`}>
+                      <span class="gate__role">
+                        {t.roles[role].name} ×<CrewCount desktop={CREW.desktop[role]} mobile={CREW.mobile[role]} />
+                      </span>
+                      <span class="gate__task">{t.roles[role].task}</span>
+                      <span class="gate__spot" data-spot={role}></span>
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+          </div>
+
+          <footer class="gate__status" aria-hidden="true">
+            <p class="gate__effort"><i set:html={diamond} /> max · ultracode · /effort</p>
+            <p class="gate__sep"><span>ultracode</span></p>
+            <p class="gate__mode">
+              <i set:html={arrows} /><b>bypass permissions on</b>
+              <span class="gate__dim"> · <CrewCount desktop={sizes.desktop} mobile={sizes.mobile} /> {t.agents}</span>
+            </p>
+          </footer>
+        </div>
+      );
+    })
+  }
+</div>
+
+<script>
+  // Solo la primera visita paga estos KB: la decisión ya la tomó el script del head.
+  if ('gate' in document.documentElement.dataset) {
+    void import('../../gate/gate');
+  } else {
+    document.querySelector('[data-gate-root]')?.remove();
+  }
+</script>
+
+<style is:global>
+  .gate {
+    display: none;
+  }
+
+  /* El script del head la abre antes del primer pintado: la terminal es lo primero que se ve. */
+  html[data-gate] {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+
+  html[data-gate] .gate {
+    position: fixed;
+    inset: 0;
+    /* Debajo del canvas: los agentes orbitan el cursor sobre la terminal y salen de ella. */
+    z-index: 35;
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--color-bg);
+    font-family: var(--font-mono);
+    font-size: clamp(0.8125rem, 0.72rem + 0.25vw, 0.9375rem);
+    line-height: 1.5;
+    transition: opacity 0.32s var(--ease-apple);
+  }
+
+  html[data-gate] .gate.is-leaving {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  html[data-gate] :is(.hud, .hud-replay, [data-swarm-toggle]) {
+    display: none !important;
+  }
+
+  html[data-gate='es'] .gate__screen:not([data-screen='es']),
+  html[data-gate='en'] .gate__screen:not([data-screen='en']) {
+    display: none;
+  }
+
+  .gate__screen {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    padding: clamp(16px, 2.2vw, 28px) clamp(14px, 1.6vw, 22px) clamp(12px, 1.4vw, 18px);
+  }
+
+  .gate__main {
+    flex: 1;
+  }
+
+  .gate i {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    font-style: normal;
+  }
+
+  .gate i svg {
+    width: 0.8em;
+    height: 0.8em;
+    fill: currentColor;
+  }
+
+  .gate__dim {
+    color: var(--color-gris);
+  }
+
+  .gate__model {
+    color: var(--color-ciruela-claro);
+  }
+
+  .gate__head {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 1.4vw, 18px);
+    margin-bottom: clamp(16px, 2.4vw, 28px);
+  }
+
+  .gate__mark {
+    flex: none;
+    width: auto;
+    height: 3.6em;
+  }
+
+  .gate__agent {
+    font-weight: 600;
+  }
+
+  /* La salida aparece de golpe, como en una terminal: nada de fundidos acá. */
+  .gate__cmd,
+  .gate__out,
+  .gate__reply,
+  .gate__ask {
+    animation: gate-show 0s linear var(--d, 0s) both;
+  }
+
+  [data-fast] :is(.gate__cmd, .gate__out, .gate__reply, .gate__ask, .gate__typed) {
+    animation: none;
+  }
+
+  @keyframes gate-show {
+    from {
+      visibility: hidden;
+    }
+
+    to {
+      visibility: visible;
+    }
+  }
+
+  .gate__cmd {
+    display: flex;
+    align-items: center;
+    gap: 0.6ch;
+    padding-inline: 0.5ch;
+    background: rgb(245 242 244 / 0.11);
+    font-weight: 500;
+  }
+
+  .gate__out {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.7ch;
+    margin: 0.1em 0 0.9em 1.1ch;
+    color: var(--color-gris);
+  }
+
+  .gate__out i {
+    height: 1.5em;
+  }
+
+  .gate__cmd--typed {
+    margin-top: 0.2em;
+  }
+
+  .gate__typed {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    animation: gate-type 0.5s steps(var(--n)) 0.34s both;
+  }
+
+  @keyframes gate-type {
+    from {
+      width: 0;
+    }
+
+    to {
+      width: calc(var(--n) * 1ch);
+    }
+  }
+
+  .gate__cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1.1em;
+    background: var(--color-text);
+    animation: gate-gone 0s linear 0.9s both;
+  }
+
+  [data-fast] .gate__cursor {
+    display: none;
+  }
+
+  @keyframes gate-gone {
+    to {
+      visibility: hidden;
+    }
+  }
+
+  .gate__reply {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1ch;
+    margin: 0.9em 0;
+  }
+
+  .gate__bullet {
+    height: 1.5em;
+    color: var(--color-ciruela-claro);
+  }
+
+  .gate .gate__bullet svg {
+    width: 0.62em;
+    height: 0.62em;
+  }
+
+  .gate__ask {
+    margin-top: 1em;
+    padding-top: 0.9em;
+    border-top: 1px solid rgb(245 242 244 / 0.16);
+  }
+
+  .gate__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3em 2.4ch;
+    margin-bottom: 0.9em;
+    color: var(--color-gris);
+  }
+
+  .gate__tabs span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7ch;
+  }
+
+  .gate .gate__tabs .is-check {
+    display: none;
+  }
+
+  .gate .gate__tabs [data-tab='launch'] .is-check {
+    display: inline-grid;
+  }
+
+  .gate__tabs .is-now {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .gate__tabs .is-done {
+    color: var(--color-ciruela-claro);
+  }
+
+  .gate .gate__tabs .is-done .is-box {
+    display: none;
+  }
+
+  .gate .gate__tabs .is-done .is-check {
+    display: inline-grid;
+  }
+
+  .gate__q {
+    margin-bottom: 0.7em;
+    font-weight: 600;
+  }
+
+  .gate__opt {
+    display: grid;
+    grid-template-columns: 1.6ch auto 1fr;
+    column-gap: 1ch;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.32em 0.5ch 0.42em;
+    border-radius: 0;
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .gate__opt:focus-visible {
+    outline: none;
+  }
+
+  .gate .gate__pointer {
+    height: 1.5em;
+    opacity: 0;
+  }
+
+  .gate__label {
+    font-weight: 500;
+  }
+
+  .gate__label em {
+    color: var(--color-gris);
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .gate__desc {
+    grid-column: 3;
+    max-width: 94ch;
+    color: var(--color-gris);
+  }
+
+  /* La opción activa: el puntero, un color y una banda, igual con teclado que con el mouse. */
+  .gate__opt.is-selected {
+    background: rgb(113 75 103 / 0.26);
+  }
+
+  .gate__opt.is-selected :is(.gate__pointer, .gate__n, .gate__label, .gate__label em) {
+    color: var(--color-ciruela-claro);
+  }
+
+  .gate .gate__opt.is-selected .gate__pointer {
+    opacity: 1;
+  }
+
+  .gate__opt.is-selected .gate__desc {
+    color: var(--color-text);
+  }
+
+  .gate__opt:active {
+    background: rgb(113 75 103 / 0.42);
+  }
+
+  .gate__hint {
+    margin-top: 0.9em;
+    color: var(--color-gris);
+  }
+
+  .gate__hint--touch {
+    display: none;
+  }
+
+  @media (hover: none) {
+    .gate__hint--keys {
+      display: none;
+    }
+
+    .gate__hint--touch {
+      display: block;
+    }
+  }
+
+  .gate__roster {
+    margin: -0.4em 0 0 1.1ch;
+  }
+
+  .gate__roster li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 2ch;
+    min-height: 2em;
+    animation: gate-show 0s linear calc(0.05s + var(--i) * 0.07s) both;
+  }
+
+  .gate__role {
+    min-width: 17ch;
+    color: var(--c);
+    font-weight: 600;
+  }
+
+  .gate__task {
+    color: var(--color-gris);
+  }
+
+  /* Acá se ubican los agentes de cada oficio cuando se reportan. */
+  .gate__spot {
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+  }
+
+  .gate__status {
+    position: sticky;
+    bottom: 0;
+    margin-top: 1.2em;
+    padding-top: 0.2em;
+    background: var(--color-bg);
+    color: var(--color-gris);
+  }
+
+  .gate__effort {
+    text-align: right;
+  }
+
+  .gate__sep {
+    display: flex;
+    align-items: center;
+    gap: 1ch;
+    margin: 0.1em 0 0.5em;
+    color: var(--color-ciruela-claro);
+  }
+
+  .gate__sep::before,
+  .gate__sep::after {
+    content: '';
+    height: 1px;
+    background: rgb(245 242 244 / 0.4);
+  }
+
+  .gate__sep::before {
+    flex: 1;
+  }
+
+  .gate__sep::after {
+    width: 2ch;
+  }
+
+  .gate__mode {
+    color: var(--color-coral);
+  }
+
+  .gate__mode b {
+    margin-left: 0.6ch;
+    font-weight: 500;
+  }
+
+  /* Pantallas bajas: lo primero que se resigna es el arranque, nunca las opciones. */
+  @media (max-height: 640px), (max-width: 480px) and (max-height: 760px) {
+    .gate__boot {
+      display: none;
+    }
+  }
+
+  @media (max-height: 640px) {
+    .gate__status {
+      position: static;
+    }
+  }
+
+  /* En angosto, una línea por oficio: el nombre, la cantidad y sus agentes. */
+  @media (max-width: 560px) {
+    .gate__task {
+      display: none;
+    }
+  }
+</style>

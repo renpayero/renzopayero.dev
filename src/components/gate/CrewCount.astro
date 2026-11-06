@@ -1,0 +1,26 @@
+---
+interface Props {
+  desktop: number;
+  mobile: number;
+}
+
+const { desktop, mobile } = Astro.props;
+---
+<span class="crew-d">{desktop}</span><span class="crew-m">{mobile}</span>
+
+<style is:global>
+  /* El mismo corte que usa el enjambre: el número es el del equipo que va a trabajar. */
+  .crew-m {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .crew-d {
+      display: none;
+    }
+
+    .crew-m {
+      display: inline;
+    }
+  }
+</style>

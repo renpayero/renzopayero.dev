@@ -214,11 +214,12 @@ test.describe('secciones', () => {
       );
     const stagePositions = () =>
       page.evaluate(() => {
-        const stage = document.querySelector('.system__stage')!.getBoundingClientRect();
-        return [...document.querySelectorAll('.system__node, .system__link')].map((el) => {
-          const r = el.getBoundingClientRect();
-          return { label: el.textContent, x: Math.round(r.x + r.width / 2 - stage.x), y: Math.round(r.y + r.height / 2 - stage.y) };
-        });
+        // offsetLeft ignora transform: sin build, las animaciones atadas al scroll escalan los nodos.
+        return [...document.querySelectorAll<HTMLElement>('.system__node, .system__link')].map((el) => ({
+          label: el.textContent,
+          x: el.offsetLeft,
+          y: el.offsetTop,
+        }));
       });
 
     await page.goto('/?build=0');
@@ -318,7 +319,7 @@ test.describe('botón "Ver el build completo"', () => {
   };
   const clickFullBuild = async (page: Page) => {
     await page.locator('[data-autopilot]').click();
-    await page.waitForFunction(() => 'autopilot' in document.documentElement.dataset, undefined, { timeout: 5000 });
+    await page.waitForFunction(() => 'pilot' in document.documentElement.dataset, undefined, { timeout: 5000 });
   };
 
   test('a mitad del primer recorrido vuelve a construir toda la página, con agentes', async ({ page }) => {

@@ -1,6 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import '../styles/global.css';
+import Gate from '../components/gate/Gate.astro';
 import BuildHud from '../components/hud/BuildHud.astro';
 import SwarmToggle from '../components/SwarmToggle.astro';
 import { ui, type Lang } from '../i18n/ui';
@@ -62,12 +63,12 @@ const person = {
     <meta name="twitter:card" content="summary_large_image" />
     {path === '/' && <script type="application/ld+json" set:html={JSON.stringify(person)} />}
     <Font cssVariable="--font-inter" preload />
-    <Font cssVariable="--font-geist" />
+    <Font cssVariable="--font-geist" preload={build} />
     <!--
-      Decide antes del primer pintado si corre el build. Sin JS o con reduced motion
-      la página llega en su estado final. Si el motor no carga, el watchdog la libera.
+      Decide antes del primer pintado si corre el build y si pregunta la terminal. Sin JS o
+      con reduced motion la página llega en su estado final. Si algo no carga, el watchdog la libera.
     -->
-    <script is:inline define:vars={{ build }}>
+    <script is:inline define:vars={{ build, lang }}>
       (function () {
         var root = document.documentElement;
         root.dataset.js = '';
@@ -80,14 +81,22 @@ const person = {
         try {
           seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < 6048e5;
         } catch (e) {}
-        if (seen && mode !== '1' && mode !== 'full') return;
-        if (mode === 'full') {
-          root.dataset.autopilot = '';
+        var asked = mode === '1' || mode === 'full' || mode === 'present';
+        if (seen && !asked) return;
+        if (mode === 'full' || mode === 'present') {
+          root.dataset.pilot = mode;
           history.scrollRestoration = 'manual';
         }
         root.dataset.build = 'pending';
+        // Primera visita a la portada: pregunta la terminal, en el idioma del visitante.
+        if (!asked && !location.hash) {
+          root.dataset.gate = lang === 'en' || !/^es\b/i.test(navigator.language || '') ? 'en' : 'es';
+          history.scrollRestoration = 'manual';
+        }
         setTimeout(function () {
-          if (root.dataset.build === 'pending') {
+          var gate = 'gate' in root.dataset;
+          if (gate ? !('gateReady' in root.dataset) : root.dataset.build === 'pending') {
+            delete root.dataset.gate;
             root.dataset.build = 'off';
             dispatchEvent(new Event('rp:release'));
           }
@@ -96,6 +105,7 @@ const person = {
     </script>
   </head>
   <body>
+    {build && <Gate lang={lang} />}
     <a href="#main" class="skip-link">{t.skip}</a>
     {build && <BuildHud lang={lang} />}
     <SwarmToggle lang={lang} beside={build} />

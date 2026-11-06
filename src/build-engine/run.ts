@@ -2,7 +2,7 @@ import gsap from 'gsap';
 import { ui, type Lang, type RoleId } from '../i18n/ui';
 import { getSwarm } from '../swarm/swarm';
 import { Crew } from './agents';
-import { runAutopilot } from './autopilot';
+import { runAutopilot, type Pilot } from './autopilot';
 import { loadAtlas } from './glyphs';
 import type { PlanContext } from './plans/context';
 import { heroPlan } from './plans/hero';
@@ -52,12 +52,16 @@ class Director {
   private builtSeconds = 0;
   private closed = false;
   private idleTimer = 0;
+  private paused = false;
+  private pilot: Pilot | null = null;
+  // En presentación manda el piloto: cada sección arranca cuando la página ya llegó.
+  private held = false;
 
   private readonly onTrigger: IntersectionObserverCallback = (entries) => {
     for (const entry of entries) {
       const section = entry.target as HTMLElement;
       if (entry.isIntersecting) {
-        this.request(section);
+        if (!this.held) this.request(section);
       } else if (this.active?.section === section && entry.boundingClientRect.bottom < 0) {
         // El visitante ya siguió de largo: esa sección no lo hace esperar.
         this.complete();
@@ -101,7 +105,7 @@ class Director {
       segs?.append(seg);
     }
 
-    this.toggle?.addEventListener('click', () => this.setPaused(!this.active?.timeline.paused()));
+    this.toggle?.addEventListener('click', () => this.setPaused(!this.paused));
     hud.querySelector('[data-hud-skip]')?.addEventListener('click', () => this.skipAll());
     addEventListener('keydown', this.onKey);
     addEventListener('resize', this.onResize);
@@ -125,18 +129,38 @@ class Director {
     void document.fonts.ready.then(() => {
       if (this.closed) return;
       this.run(hero);
-      for (const section of this.sections) {
-        (section.dataset.start === 'top' ? this.triggerTop : this.trigger).observe(section);
-      }
-      if ('autopilot' in this.root.dataset) this.startAutopilot();
+      this.watchSections();
+      if ('pilot' in this.root.dataset) this.startAutopilot();
     });
   }
 
+  private watchSections(): void {
+    this.trigger.disconnect();
+    this.triggerTop.disconnect();
+    for (const section of this.sections) {
+      if (!('built' in section.dataset)) (section.dataset.start === 'top' ? this.triggerTop : this.trigger).observe(section);
+    }
+  }
+
   private startAutopilot(): void {
-    void runAutopilot({
+    const pace = this.root.dataset.pilot === 'present' ? 'present' : 'full';
+    this.held = pace === 'present';
+    this.pilot = runAutopilot({
       sections: this.sections,
       isBuilt: (section) => 'built' in section.dataset,
+      pace,
+      request: (section) => this.request(section),
+      onStop: () => this.takeBackControl(),
     });
+  }
+
+  /** Un gesto del visitante: desde acá las secciones se construyen cuando él llega. */
+  private takeBackControl(): void {
+    if (!this.held || this.closed) return;
+    this.held = false;
+    // Observar de nuevo fuerza una evaluación: la sección en pantalla arranca sin esperar otro scroll.
+    this.watchSections();
+    if (!this.active) this.goIdle();
   }
 
   private context(cleanups: Array<() => void>, working: Set<Agent>): PlanContext {
@@ -163,6 +187,7 @@ class Director {
   }
 
   private run(section: HTMLElement): void {
+    if (this.paused) this.setPaused(false);
     this.finishMicros();
     const cleanups: Array<() => void> = [];
     const working = new Set<Agent>();
@@ -256,6 +281,8 @@ class Director {
   private goIdle(): void {
     const done = this.sections.filter((s) => 'built' in s.dataset).length;
     if (this.text) this.text.textContent = this.t.hud.progress(done, this.sections.length);
+    // Mientras presenta, la píldora sigue entera: es la que permite pausar o saltar.
+    if (this.held) return;
     this.idleTimer = window.setTimeout(() => {
       this.hud.dataset.idle = 'true';
     }, 700);
@@ -268,11 +295,15 @@ class Director {
   }
 
   private setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.pilot?.setPaused(paused);
     const active = this.active;
-    if (!active || !this.toggle) return;
-    active.timeline.paused(paused);
-    if (paused) active.pausedAt = performance.now();
-    else active.pausedFor += performance.now() - active.pausedAt;
+    if (active) {
+      active.timeline.paused(paused);
+      if (paused) active.pausedAt = performance.now();
+      else active.pausedFor += performance.now() - active.pausedAt;
+    }
+    if (!this.toggle) return;
     this.toggle.setAttribute('aria-label', (paused ? this.toggle.dataset.play : this.toggle.dataset.pause) ?? '');
     this.toggle.querySelector('[data-icon-pause]')?.toggleAttribute('hidden', paused);
     this.toggle.querySelector('[data-icon-play]')?.toggleAttribute('hidden', !paused);
@@ -280,6 +311,8 @@ class Director {
 
   /** Saltar: toda la página queda en su estado final, sin informar un tiempo que no existió. */
   private skipAll(): void {
+    this.held = false;
+    this.pilot?.stop();
     this.queue.length = 0;
     this.finishMicros();
     this.closed = true;
@@ -301,6 +334,8 @@ class Director {
   private close(ranFull: boolean): void {
     if (this.closed) return;
     this.closed = true;
+    this.held = false;
+    this.pilot?.stop();
     window.clearTimeout(this.idleTimer);
     this.trigger.disconnect();
     this.triggerTop.disconnect();
