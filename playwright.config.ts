@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4322;
+// Astro permite una sola instancia de preview: TEST_PORT reutiliza la que ya está corriendo (hay que compilar antes).
+const PORT = Number(process.env.TEST_PORT ?? 4322);
 
 export default defineConfig({
   testDir: './tests',
@@ -24,6 +25,6 @@ export default defineConfig({
     command: `npm run build && npm run preview -- --port ${PORT} --host 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}`,
     timeout: 120_000,
-    reuseExistingServer: false,
+    reuseExistingServer: Boolean(process.env.TEST_PORT),
   },
 });

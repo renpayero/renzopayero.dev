@@ -74,20 +74,17 @@ const person = {
         if (!build) return;
         var params = new URLSearchParams(location.search);
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        if (params.get('build') === '0') return;
-        var WEEK = 6048e5;
+        var mode = params.get('build');
+        if (mode === '0') return;
         var seen = false;
-        var replay = false;
         try {
-          seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < WEEK;
-          replay = sessionStorage.getItem('rp-replay') === '1';
-          if (replay) {
-            sessionStorage.removeItem('rp-replay');
-            root.dataset.autopilot = '';
-            history.scrollRestoration = 'manual';
-          }
+          seen = Date.now() - Number(localStorage.getItem('rp-built') || 0) < 6048e5;
         } catch (e) {}
-        if (seen && !replay && params.get('build') !== '1') return;
+        if (seen && mode !== '1' && mode !== 'full') return;
+        if (mode === 'full') {
+          root.dataset.autopilot = '';
+          history.scrollRestoration = 'manual';
+        }
         root.dataset.build = 'pending';
         setTimeout(function () {
           if (root.dataset.build === 'pending') {

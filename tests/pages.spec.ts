@@ -134,9 +134,8 @@ test.describe('proyectos', () => {
 
 test.describe('build completo', () => {
   const launch = async (page: import('@playwright/test').Page) => {
-    await page.goto('/?build=1');
+    await page.goto('/?build=full');
     await page.waitForFunction(() => Boolean(window.__rpBuild));
-    await page.evaluate(() => dispatchEvent(new Event('rp:autopilot')));
   };
 
   test('recorre la página solo', async ({ page }) => {

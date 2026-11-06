@@ -38,20 +38,11 @@ const t = ui[lang].hud;
     import('../../build-engine/run').then((engine) => engine.start());
   }
 
-  // El build completo: si la página todavía se está construyendo arranca ya; si no, vuelve a empezar.
+  // El build completo siempre arranca de cero: para llegar a este botón ya se construyó lo anterior.
   const fullBuild = (): void => {
-    if (root.dataset.build === 'running') {
-      dispatchEvent(new Event('rp:autopilot'));
-      return;
-    }
-    try {
-      sessionStorage.setItem('rp-replay', '1');
-    } catch {
-      // Sin almacenamiento, ?build=1 fuerza el build igual, aunque sin recorrido automático.
-    }
     scrollTo({ top: 0, behavior: 'instant' });
     const url = new URL(location.href);
-    url.searchParams.set('build', '1');
+    url.searchParams.set('build', 'full');
     url.hash = '';
     location.href = url.toString();
   };

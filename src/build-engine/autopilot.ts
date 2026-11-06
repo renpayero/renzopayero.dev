@@ -3,7 +3,6 @@ import gsap from 'gsap';
 interface AutopilotDeps {
   sections: HTMLElement[];
   isBuilt: (section: HTMLElement) => boolean;
-  onEnd: () => void;
 }
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,7 +11,7 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
  * El build completo, como en el reel: recorre la página sola mientras los agentes construyen.
  * Cualquier gesto del visitante le devuelve el control al instante: el scroll nunca se pelea.
  */
-export async function runAutopilot({ sections, isBuilt, onEnd }: AutopilotDeps): Promise<void> {
+export async function runAutopilot({ sections, isBuilt }: AutopilotDeps): Promise<void> {
   let stopped = false;
   let tween: gsap.core.Tween | null = null;
   const INTERRUPTS = ['wheel', 'touchstart', 'pointerdown'] as const;
@@ -62,6 +61,5 @@ export async function runAutopilot({ sections, isBuilt, onEnd }: AutopilotDeps):
   } finally {
     for (const type of INTERRUPTS) removeEventListener(type, stop);
     removeEventListener('keydown', onKey);
-    onEnd();
   }
 }

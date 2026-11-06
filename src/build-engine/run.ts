@@ -105,22 +105,14 @@ class Director {
       if (this.closed) return;
       this.run(hero);
       for (const section of this.sections) this.trigger.observe(section);
-      addEventListener('rp:autopilot', () => this.startAutopilot());
       if ('autopilot' in this.root.dataset) this.startAutopilot();
     });
   }
 
-  private autopilotOn = false;
-
   private startAutopilot(): void {
-    if (this.autopilotOn || this.closed) return;
-    this.autopilotOn = true;
     void runAutopilot({
       sections: this.sections,
       isBuilt: (section) => 'built' in section.dataset,
-      onEnd: () => {
-        this.autopilotOn = false;
-      },
     });
   }
 

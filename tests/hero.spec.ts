@@ -249,6 +249,90 @@ test.describe('secciones', () => {
   });
 });
 
+test.describe('botón "Ver el build completo"', () => {
+  const SECTIONS = ['manifiesto', 'sistema', 'proyectos', 'experiencia', 'capacidades', 'como'];
+
+  // Registra qué secciones construyó un timeline de verdad y cuántos agentes salieron a trabajar.
+  // Se reinicia en cada carga: mide solo lo que pasa después de tocar el botón.
+  const watchBuilds = (page: Page) =>
+    page.addInitScript(() => {
+      const w = window as unknown as {
+        __rpSwarm?: { agents: Array<{ mode: string }> };
+        __built: Record<string, number>;
+      };
+      w.__built = {};
+      setInterval(() => {
+        const section = window.__rpBuild?.section;
+        if (!section) return;
+        const working = w.__rpSwarm?.agents.filter((a) => a.mode === 'task').length ?? 0;
+        w.__built[section] = Math.max(w.__built[section] ?? 0, working);
+      }, 30);
+    });
+  const built = (page: Page) => page.evaluate(() => (window as unknown as { __built: Record<string, number> }).__built);
+  const walkTo = async (page: Page, name: string) => {
+    const selector = `[data-section="${name}"]`;
+    await page.evaluate((sel) => {
+      const top = (document.querySelector(sel)?.getBoundingClientRect().top ?? 0) + scrollY;
+      scrollTo({ top, behavior: 'instant' });
+    }, selector);
+    await page.waitForFunction((sel) => 'built' in (document.querySelector<HTMLElement>(sel)?.dataset ?? {}), selector, { timeout: 8000 });
+  };
+  const clickFullBuild = async (page: Page) => {
+    await page.locator('[data-autopilot]').click();
+    await page.waitForFunction(() => 'autopilot' in document.documentElement.dataset, undefined, { timeout: 5000 });
+  };
+
+  test('a mitad del primer recorrido vuelve a construir toda la página, con agentes', async ({ page }) => {
+    test.setTimeout(180_000);
+    await watchBuilds(page);
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    // Para llegar al botón ya se construyó todo lo anterior. Contacto sigue pendiente: es el caso del bug.
+    for (const name of SECTIONS) await walkTo(page, name);
+    expect(await state(page)).toBe('running');
+
+    await clickFullBuild(page);
+    expect(await page.evaluate(() => document.querySelectorAll('[data-section]:not([data-section="hero"])[data-built]').length)).toBe(0);
+    await waitDone(page, 140_000);
+
+    const done = await built(page);
+    for (const name of ['hero', ...SECTIONS, 'contacto']) {
+      expect(done[name] ?? 0, `agentes trabajando en ${name}`).toBeGreaterThan(0);
+    }
+    await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
+  });
+
+  test('con la página ya terminada vuelve a construirla', async ({ page }) => {
+    test.setTimeout(120_000);
+    await watchBuilds(page);
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    for (const name of [...SECTIONS, 'contacto']) await walkTo(page, name);
+    await waitDone(page);
+
+    await clickFullBuild(page);
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('[data-section="manifiesto"]')?.dataset ?? {}), undefined, { timeout: 30_000 });
+    const done = await built(page);
+    expect(done.hero ?? 0).toBeGreaterThan(0);
+    expect(done.manifiesto ?? 0).toBeGreaterThan(0);
+  });
+
+  test('en una visita repetida, con todo ya visible, también construye', async ({ page }) => {
+    test.setTimeout(120_000);
+    await watchBuilds(page);
+    await page.goto('/?build=1');
+    await heroBuilt(page);
+    await page.goto('/');
+    expect(await state(page)).toBeNull();
+
+    await clickFullBuild(page);
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('[data-section="manifiesto"]')?.dataset ?? {}), undefined, { timeout: 30_000 });
+    const done = await built(page);
+    expect(done.hero ?? 0).toBeGreaterThan(0);
+    expect(done.manifiesto ?? 0).toBeGreaterThan(0);
+  });
+});
+
 test.describe('enjambre', () => {
   interface SwarmView {
     agents: Array<{ x: number; y: number; mode: string; alpha: number }>;
