@@ -28,6 +28,7 @@ export const ui = {
       progress: (done: number, total: number) => `${done} de ${total} secciones`,
       goLive: 'Go-live',
     },
+    swarm: { toggle: 'Mostrar u ocultar los agentes' },
     roles: {
       relevamiento: 'Relevamiento',
       arquitectura: 'Arquitectura',
@@ -63,6 +64,7 @@ export const ui = {
       progress: (done: number, total: number) => `${done} of ${total} sections`,
       goLive: 'Go-live',
     },
+    swarm: { toggle: 'Show or hide the agents' },
     roles: {
       relevamiento: 'Discovery',
       arquitectura: 'Architecture',

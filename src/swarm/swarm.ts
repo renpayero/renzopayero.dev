@@ -59,6 +59,7 @@ export class Swarm {
   readonly overlay = new Overlay();
   readonly random = seeded(20261105);
   private readonly hasPointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  private orbitVisible = this.hasPointer;
 
   private pointerX = innerWidth / 2;
   private pointerY = innerHeight / 2;
@@ -152,7 +153,17 @@ export class Swarm {
   /** Mientras construyen, nadie se distrae inspeccionando lo que toca el cursor. */
   setBusy(busy: boolean): void {
     this.busy = busy ? 1 : 0;
-    if (busy) this.endInspection();
+    if (busy) {
+      this.endInspection();
+      this.start();
+    }
+  }
+
+  /** El visitante puede ocultar la órbita; aun así, los agentes se ven mientras trabajan. */
+  setOrbitVisible(visible: boolean): void {
+    this.orbitVisible = visible && this.hasPointer;
+    if (!this.orbitVisible) this.endInspection();
+    this.start();
   }
 
   /** Toda la página construida: la órbita se abre de golpe y vuelve a respirar. */
@@ -173,7 +184,7 @@ export class Swarm {
     addEventListener(
       'pointerdown',
       (event) => {
-        if (event.pointerType === 'touch') return;
+        if (event.pointerType === 'touch' || !this.orbitVisible) return;
         this.burst(event.clientX, event.clientY + scrollY);
       },
       { passive: true },
@@ -181,7 +192,7 @@ export class Swarm {
     document.addEventListener(
       'pointerover',
       (event) => {
-        if (event.pointerType === 'touch' || this.busy) return;
+        if (event.pointerType === 'touch' || this.busy || !this.orbitVisible) return;
         const el = event.target instanceof Element ? event.target.closest(INSPECTABLE) : null;
         if (el !== (this.inspection?.el ?? null)) this.inspect(el);
       },
@@ -303,8 +314,14 @@ export class Swarm {
     this.time += dt;
     this.trackTasks(dt);
     for (let rest = dt; rest > 1e-5; rest -= STEP) this.update(Math.min(rest, STEP), now);
-    this.aura += ((this.hasPointer && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
+    this.aura += ((this.orbitVisible && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
     this.overlay.render(this.agents, this.pointerX, this.pointerY, this.aura * (0.8 + this.energy * 0.4), dt);
+    // Sin nada que mostrar no se gasta ni un cuadro: en táctil, o con la órbita oculta.
+    const resting = !this.orbitVisible && !this.busy && this.aura < 0.01 && this.agents.every((a) => a.mode !== 'task' && a.alpha < 0.01);
+    if (resting) {
+      this.running = false;
+      return;
+    }
     requestAnimationFrame(this.tick);
   };
 
@@ -337,7 +354,7 @@ export class Swarm {
     this.lastScroll = scrollY;
     const anchorX = this.pointerX;
     const anchorY = this.pointerY + scrollY;
-    const rest = this.hasPointer ? 1 : 0;
+    const rest = this.orbitVisible ? 1 : 0;
 
     for (const agent of this.agents) {
       if (agent.mode === 'task') {

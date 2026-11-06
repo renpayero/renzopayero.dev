@@ -335,6 +335,56 @@ test.describe('enjambre', () => {
   });
 });
 
+test.describe('navegación', () => {
+  test('la barra sticky aparece recién al dejar el hero, también en táctil', async ({ page }) => {
+    await page.goto('/?build=0');
+    await expect(page.locator('.localnav')).toBeHidden();
+    await page.evaluate(() => scrollTo({ top: innerHeight * 1.3, behavior: 'instant' }));
+    await expect(page.locator('.localnav')).toBeVisible();
+    await expect(page.locator('.localnav__cta')).toHaveAttribute('href', '#contacto');
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    await expect(page.locator('.localnav')).toBeHidden();
+  });
+});
+
+test.describe('control del enjambre', () => {
+  test('se puede ocultar, y la preferencia se recuerda', async ({ page }) => {
+    await page.goto('/?build=0');
+    await page.mouse.move(4, 300);
+    await page.mouse.move(6, 302);
+    await page.waitForTimeout(500);
+    const visible = () =>
+      page.evaluate(() => {
+        const swarm = (window as unknown as { __rpSwarm?: { agents: Array<{ alpha: number }> } }).__rpSwarm;
+        return Math.max(...(swarm?.agents.map((a) => a.alpha) ?? [0]));
+      });
+    expect(await visible()).toBeGreaterThan(0.5);
+    const toggle = page.locator('[data-swarm-toggle]');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await page.mouse.move(4, 300);
+    await page.waitForTimeout(800);
+    expect(await visible()).toBeLessThan(0.05);
+
+    await page.reload();
+    await page.mouse.move(4, 300);
+    await page.mouse.move(6, 302);
+    await page.waitForTimeout(500);
+    expect(await visible()).toBeLessThan(0.05);
+    await expect(page.locator('[data-swarm-toggle]')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('sin puntero (táctil) el enjambre no orbita ni consume cuadros en reposo', async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const page = await context.newPage();
+    await page.goto(`${baseURL}/?build=0`);
+    await page.waitForTimeout(600);
+    await expect(page.locator('canvas[data-swarm]')).toHaveCount(0);
+    await expect(page.locator('[data-swarm-toggle]')).toBeHidden();
+    await context.close();
+  });
+});
+
 test.describe('calidad', () => {
   test('sin scroll lateral', async ({ page }) => {
     await page.goto('/?build=0');
@@ -352,7 +402,7 @@ test.describe('calidad', () => {
     await page.goto('/?build=1');
     await heroBuilt(page);
     // axe no evalúa -webkit-text-stroke. WCAG toma el contorno como borde de la letra:
-    // el del nombre (#F5F2F4 sobre #0B070A) da 18:1. Solo se excluye ese elemento.
+    // el del neón (#F5F2F4 sobre #0B070A) da 18:1. Solo se excluyen esos elementos.
     const results = await new AxeBuilder({ page }).exclude('.name__lit').exclude('.contact__lit').analyze();
     expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`)).toEqual([]);
   });

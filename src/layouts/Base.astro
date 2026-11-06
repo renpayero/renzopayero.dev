@@ -2,6 +2,7 @@
 import { Font } from 'astro:assets';
 import '../styles/global.css';
 import BuildHud from '../components/hud/BuildHud.astro';
+import SwarmToggle from '../components/SwarmToggle.astro';
 import { ui, type Lang } from '../i18n/ui';
 
 interface Props {
@@ -100,6 +101,7 @@ const person = {
   <body>
     <a href="#main" class="skip-link">{t.skip}</a>
     {build && <BuildHud lang={lang} />}
+    <SwarmToggle lang={lang} beside={build} />
     <slot />
     <script>
       import '../motion/reveal';

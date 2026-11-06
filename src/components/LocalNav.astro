@@ -18,49 +18,41 @@ const t = ui[lang];
 </nav>
 
 <style is:global>
-  /* La barra de producto de Apple: aparece al dejar el hero, con CSS y sin un solo listener. */
+  /* La barra de producto de Apple: aparece al dejar el hero. Sin JS está la barra superior. */
   .localnav {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    z-index: 30;
     display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: min(838px, calc(100vw - 16px));
+    height: 48px;
+    padding: 0 8px 0 18px;
+    border: 1px solid rgb(245 242 244 / 0.08);
+    border-radius: 980px;
+    background: rgb(24 19 23 / 0.78);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, -12px);
+    transition:
+      opacity 0.32s var(--ease-apple),
+      transform 0.32s var(--ease-apple),
+      visibility 0.32s;
   }
 
-  @supports (animation-timeline: scroll()) {
-    @media (prefers-reduced-motion: no-preference) {
-      .localnav {
-        position: fixed;
-        top: 8px;
-        left: 50%;
-        z-index: 30;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        width: min(838px, calc(100vw - 16px));
-        height: 48px;
-        padding: 0 8px 0 18px;
-        border: 1px solid rgb(245 242 244 / 0.08);
-        border-radius: 980px;
-        background: rgb(24 19 23 / 0.78);
-        backdrop-filter: blur(24px) saturate(160%);
-        -webkit-backdrop-filter: blur(24px) saturate(160%);
-        translate: -50% 0;
-        animation: localnav-in linear both;
-        animation-timeline: scroll(root block);
-        animation-range: 90vh 104vh;
-      }
+  [data-js] .localnav {
+    display: flex;
+  }
 
-      @keyframes localnav-in {
-        from {
-          opacity: 0;
-          visibility: hidden;
-          transform: translateY(-12px);
-        }
-        to {
-          opacity: 1;
-          visibility: visible;
-          transform: none;
-        }
-      }
-    }
+  .localnav.is-on {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
   }
 
   .localnav__brand {

@@ -2,6 +2,15 @@
 // y la transición corre por tiempo. Si la sección todavía se va a construir, espera a los agentes.
 const root = document.documentElement;
 
+// La barra sticky acompaña apenas el hero queda atrás, con o sin preferencia de movimiento.
+const localNav = document.querySelector('.localnav');
+const hero = document.querySelector('.hero');
+if (localNav && hero) {
+  new IntersectionObserver(([entry]) => {
+    localNav.classList.toggle('is-on', !(entry?.isIntersecting ?? true));
+  }, { rootMargin: '-10% 0px 0px 0px' }).observe(hero);
+}
+
 if (matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   const building = (): boolean => root.dataset.build === 'pending' || root.dataset.build === 'running';
 

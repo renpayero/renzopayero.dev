@@ -1,0 +1,81 @@
+---
+import eye from '@phosphor-icons/core/assets/regular/eye.svg?raw';
+import eyeOff from '@phosphor-icons/core/assets/regular/eye-slash.svg?raw';
+import { ui, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  /** En la home comparte esquina con el botón de reconstruir. */
+  beside?: boolean;
+}
+
+const { lang, beside = false } = Astro.props;
+const t = ui[lang].swarm;
+---
+<button
+  type="button"
+  class:list={['swarm-toggle', { 'swarm-toggle--beside': beside }]}
+  data-swarm-toggle
+  aria-pressed="true"
+  aria-label={t.toggle}
+  title={t.toggle}
+>
+  <span class="hud__icon" data-swarm-on set:html={eye} />
+  <span class="hud__icon" data-swarm-off hidden set:html={eyeOff} />
+</button>
+
+<style is:global>
+  /* Un movimiento continuo se tiene que poder apagar (WCAG 2.2.2). Solo existe si hay enjambre. */
+  .swarm-toggle {
+    display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    [data-js] .swarm-toggle {
+      position: fixed;
+      right: 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgb(245 242 244 / 0.08);
+      border-radius: 50%;
+      background: rgb(24 19 23 / 0.82);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      color: var(--color-text);
+      opacity: 0.7;
+      cursor: pointer;
+      transition:
+        opacity 0.32s var(--ease-apple),
+        background-color 0.32s var(--ease-apple);
+    }
+
+    [data-js] .swarm-toggle--beside {
+      right: 66px;
+    }
+
+    [data-js] .swarm-toggle:hover,
+    [data-js] .swarm-toggle:focus-visible {
+      opacity: 1;
+      background: rgb(113 75 103 / 0.9);
+    }
+
+    [data-js] .swarm-toggle .hud__icon {
+      display: grid;
+      place-items: center;
+    }
+
+    [data-js] .swarm-toggle .hud__icon[hidden] {
+      display: none;
+    }
+
+    [data-js] .swarm-toggle svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+  }
+</style>

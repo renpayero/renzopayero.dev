@@ -254,8 +254,9 @@ const tiles = await Promise.all(
   .gallery__dot {
     display: grid;
     place-items: center;
+    min-width: 24px;
     height: 44px;
-    padding-inline: 5px;
+    padding-inline: 8px;
     cursor: pointer;
   }
 
@@ -293,7 +294,7 @@ const tiles = await Promise.all(
     }
 
     .tile__shade {
-      background: linear-gradient(to top, rgb(11 7 10 / 0.96), rgb(11 7 10 / 0.7) 48%, transparent 76%);
+      background: linear-gradient(to top, rgb(11 7 10 / 0.99), rgb(11 7 10 / 0.94) 52%, rgb(11 7 10 / 0.4) 66%, transparent 80%);
     }
 
     .tile__video {
