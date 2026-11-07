@@ -283,8 +283,8 @@ class Director {
   private goIdle(): void {
     const done = this.sections.filter((s) => 'built' in s.dataset).length;
     if (this.text) this.text.textContent = this.t.hud.progress(done, this.sections.length);
-    // Mientras presenta, la píldora sigue entera: es la que permite pausar o saltar.
-    if (this.held) return;
+    // Mientras presenta o está en pausa, la píldora sigue entera: es la que permite seguir o saltar.
+    if (this.held || this.paused) return;
     this.idleTimer = window.setTimeout(() => {
       this.hud.dataset.idle = 'true';
     }, 700);
@@ -304,6 +304,13 @@ class Director {
       active.timeline.paused(paused);
       if (paused) active.pausedAt = performance.now();
       else active.pausedFor += performance.now() - active.pausedAt;
+    }
+    // Pausar entre dos secciones no puede esconder el botón para seguir.
+    if (paused) {
+      window.clearTimeout(this.idleTimer);
+      this.hud.dataset.idle = 'false';
+    } else if (!active && !this.closed) {
+      this.goIdle();
     }
     if (!this.toggle) return;
     this.toggle.setAttribute('aria-label', (paused ? this.toggle.dataset.play : this.toggle.dataset.pause) ?? '');

@@ -382,6 +382,20 @@ test.describe('modo presentación', () => {
     });
   }
 
+  // Regresión: pausar justo al terminar una sección escondía el botón de seguir, y quedaba trabado.
+  test('en full, pausar entre dos secciones deja el botón para seguir', async ({ page }) => {
+    await page.goto('/?build=full');
+    await heroBuilt(page);
+    await page.locator('[data-hud-toggle]').click();
+    await page.waitForTimeout(1200);
+    await expect(page.locator('[data-hud-toggle]')).toBeVisible();
+    const frozen = await page.evaluate(() => scrollY);
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => scrollY)).toBe(frozen);
+    await page.locator('[data-hud-toggle]').click();
+    await page.waitForFunction((y) => scrollY > y + 20, frozen, { timeout: 10_000 });
+  });
+
   test('saltar deja la página final y corta el recorrido', async ({ page }) => {
     await launch(page);
     await heroBuilt(page);
