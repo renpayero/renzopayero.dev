@@ -715,6 +715,15 @@ test.describe('los agentes hablan', () => {
 test.describe('reglas', () => {
   const tools = (page: Page) =>
     page.evaluate(() => (window as unknown as { __rpSwarm?: { overlay: { tools: number } } }).__rpSwarm?.overlay.tools ?? 0);
+  /** Cuántos píxeles tiene pintados el canvas del enjambre: lo que ve el visitante, no el estado. */
+  const painted = (page: Page) =>
+    page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-swarm]');
+      const data = canvas?.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      if (data) for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) count++;
+      return count;
+    });
 
   test('aparecen mientras construyen y se van cuando terminan', async ({ page }) => {
     await page.goto('/?build=1');
@@ -723,6 +732,28 @@ test.describe('reglas', () => {
     await heroBuilt(page);
     await page.keyboard.press('Escape');
     await expect.poll(() => tools(page), { timeout: 4000 }).toBeLessThan(0.02);
+  });
+
+  // Regresión: en táctil el enjambre descansa apenas los agentes se apagan, y el canvas conserva
+  // el último cuadro. Si las reglas seguían ahí, quedaban pintadas para siempre sobre la página.
+  test('en un celular táctil, al terminar el build no queda nada pintado', async ({ browser, baseURL, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox no emula isMobile');
+    test.setTimeout(90_000);
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const page = await context.newPage();
+    await page.goto(`${baseURL}/?build=1`);
+    await heroBuilt(page, 12_000);
+    await page.evaluate(async () => {
+      document.documentElement.style.scrollBehavior = 'auto';
+      for (let y = 0; y < document.documentElement.scrollHeight; y += innerHeight * 0.5) {
+        scrollTo(0, y);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+    });
+    await waitDone(page, 60_000);
+    await expect.poll(() => tools(page), { timeout: 5000 }).toBeLessThan(0.02);
+    await expect.poll(() => painted(page), { timeout: 3000 }).toBe(0);
+    await context.close();
   });
 
   test('en la página terminada no aparecen', async ({ page }) => {

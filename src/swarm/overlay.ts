@@ -197,6 +197,18 @@ export class Overlay {
     this.tooling = busy;
   }
 
+  /** Sin reglas, globitos ni líneas de despacho: recién ahí el enjambre puede dejar de pintar. */
+  get quiet(): boolean {
+    return this.tools < 0.01 && this.bubbles.length === 0 && this.tethers.length === 0 && this.ripples.length === 0;
+  }
+
+  /** Movimiento reducido: las reglas se van ya, sin fundido. */
+  dropTools(): void {
+    this.tooling = false;
+    this.toolsOffAt = -Infinity;
+    this.tools = 0;
+  }
+
   /** Corta la frase en renglones que entran en el globito. */
   measureBubble(name: string, text: string): Pick<Bubble, 'lines' | 'w' | 'h'> {
     const { ctx } = this;

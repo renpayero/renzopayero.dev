@@ -517,6 +517,18 @@ test.describe('pedir menos movimiento con la página abierta', () => {
         }),
       )
       .toBe(true);
+    // Lo que queda en el canvas es lo que se ve: ni agentes, ni reglas, ni globitos.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-swarm]');
+          const data = canvas?.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          if (data) for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) count++;
+          return count;
+        }),
+      )
+      .toBe(0);
     // Quieta de verdad: ni scroll automático ni videos.
     const before = await page.evaluate(() => scrollY);
     await page.waitForTimeout(800);

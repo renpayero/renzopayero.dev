@@ -126,6 +126,7 @@ export class Swarm {
     this.overlay.ripples.length = 0;
     this.overlay.tethers.length = 0;
     this.overlay.bubbles.length = 0;
+    this.overlay.dropTools();
     this.leaving = [];
     this.aura = 0;
     for (const agent of this.agents) {
@@ -152,7 +153,7 @@ export class Swarm {
   borrow(agent: Agent): void {
     if (agent.mode === 'pin') this.endInspection();
     if (agent.mode !== 'task') {
-      this.overlay.tethers.push({ agent, age: 0 });
+      if (!this.halted) this.overlay.tethers.push({ agent, age: 0 });
       this.shift(agent, -this.overlay.dx, -this.overlay.dy);
     }
     agent.mode = 'task';
@@ -182,7 +183,7 @@ export class Swarm {
   /** Mientras construyen, nadie se distrae inspeccionando lo que toca el cursor. */
   setBusy(busy: boolean): void {
     this.busy = busy ? 1 : 0;
-    this.overlay.setTooling(busy);
+    this.overlay.setTooling(busy && !this.halted);
     if (busy) {
       this.endInspection();
       this.start();
@@ -376,7 +377,13 @@ export class Swarm {
     this.aura += ((this.orbitVisible && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
     this.overlay.render(this.agents, this.pointerX, this.pointerY, this.aura * (0.8 + this.energy * 0.4), dt);
     // Sin nada que mostrar no se gasta ni un cuadro: en táctil, o con la órbita oculta.
-    const resting = !this.orbitVisible && !this.busy && this.aura < 0.01 && this.agents.every((a) => a.mode !== 'task' && a.alpha < 0.01);
+    // El último cuadro queda pintado: no se descansa hasta que las reglas y los globitos se fueron.
+    const resting =
+      !this.orbitVisible &&
+      !this.busy &&
+      this.aura < 0.01 &&
+      this.overlay.quiet &&
+      this.agents.every((a) => a.mode !== 'task' && a.alpha < 0.01);
     if (resting) {
       this.running = false;
       return;
