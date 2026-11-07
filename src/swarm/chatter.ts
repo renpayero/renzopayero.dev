@@ -1,13 +1,18 @@
 import { contrast } from '../build-engine/dom';
 import { chatter, type Deck, type Facts, type Line } from '../i18n/chatter';
 import { ui, type Lang } from '../i18n/ui';
-import type { Agent, Bubble, Overlay } from './overlay';
+import { bubbleBox, type Agent, type Bubble, type Overlay } from './overlay';
 
 const FIRST_IDLE = 4000; // ms con el cursor quieto antes de que alguien hable
 const GAP: readonly [number, number] = [6500, 9000]; // ms entre un globito y el siguiente
 const STEP_OUT = 150; // px: el que habla sale de la órbita hasta acá, al costado del cursor
 const LET_GO = 28; // px de cursor que cortan la charla: el visitante volvió
 const EDGE = 8;
+const RECHECK = 300; // ms: mientras habla, cada tanto mira si apareció algo debajo
+const SETTLED = 700; // ms sin scroll: con la página en movimiento, todo pasa por debajo del globito
+const DRIFT = 48; // px de scroll que cortan la charla: la página siguió, y el agente vuelve a trabajar
+const ARRIVED = 14; // px de su lugar: recién ahí abre la boca
+const WALK = 1200; // ms para llegar; si no llega, no habla
 
 const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max);
 
@@ -34,11 +39,19 @@ function textAt(x: number, y: number): boolean {
   return [...range.getClientRects()].some((r) => x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 4 && y <= r.bottom + 4);
 }
 
-/** Cuántos puntos de ese rectángulo caen sobre texto: el globito no tapa lo que se está leyendo. */
+/** Un video también se mira: el teléfono que gira o una baldosa que se reproduce. */
+// Se miran todas las capas del punto: sobre un video suele haber un degradado o un texto.
+const videoAt = (x: number, y: number): boolean => document.elementsFromPoint(x, y).some((el) => el instanceof HTMLVideoElement);
+
+/** Cuántos puntos de ese rectángulo caen sobre texto o video: el globito no tapa lo que se está mirando. */
 function covered(left: number, top: number, w: number, h: number): number {
   let hits = 0;
   for (const u of [0.12, 0.5, 0.88]) {
-    for (const v of [0.25, 0.75]) if (textAt(left + w * u, top + h * v)) hits++;
+    for (const v of [0.25, 0.75]) {
+      const x = left + w * u;
+      const y = top + h * v;
+      if (textAt(x, y) || videoAt(x, y)) hits++;
+    }
   }
   return hits;
 }
@@ -72,7 +85,11 @@ interface Talk {
   offY: number;
   fromX: number;
   fromY: number;
+  fromScroll: number;
+  /** Hasta cuándo camina, y después hasta cuándo habla. */
   until: number;
+  checkedAt: number;
+  speaking: boolean;
 }
 
 export interface World {
@@ -81,7 +98,7 @@ export interface World {
   x: number;
   y: number;
   lastMove: number;
-  /** La órbita se ve y nada pide quietud. */
+  /** La órbita se ve, nadie está construyendo y nada pide quietud. */
   active: boolean;
 }
 
@@ -92,6 +109,8 @@ export interface World {
 export class Chatter {
   private talk: Talk | null = null;
   private nextAt = 0;
+  private lastScroll = scrollY;
+  private scrolledAt = 0;
   private readonly decks = new Map<string, () => Line | undefined>();
 
   constructor(
@@ -102,13 +121,31 @@ export class Chatter {
 
   /** Una vez por cuadro, antes de la física: el que habla toma su lugar junto al cursor. */
   update(now: number, dt: number, world: World): void {
+    if (Math.abs(scrollY - this.lastScroll) > 0.5) {
+      this.lastScroll = scrollY;
+      this.scrolledAt = now;
+    }
     const talk = this.talk;
     if (talk) {
-      const moved = Math.hypot(world.x - talk.fromX, world.y - talk.fromY) > LET_GO;
-      if (talk.agent.mode !== 'talk' || !world.active || moved || now >= talk.until) {
+      const moved = Math.hypot(world.x - talk.fromX, world.y - talk.fromY) > LET_GO || Math.abs(scrollY - talk.fromScroll) > DRIFT;
+      // La página no se queda quieta: una sección que se construye o la galería que avanza
+      // pueden poner texto o un video debajo. Entonces se calla antes.
+      let buried = false;
+      const { agent } = talk;
+      if (!talk.speaking && Math.hypot(agent.x - agent.pinX, agent.y - agent.pinY) < ARRIVED) {
+        // Llegó: desde acá corre el tiempo de lectura y se vigila lo que queda debajo.
+        talk.speaking = true;
+        talk.until = now + holdFor(talk.bubble.text);
+        talk.checkedAt = now;
+      } else if (talk.speaking && now - talk.checkedAt >= RECHECK) {
+        talk.checkedAt = now;
+        const { left, top } = bubbleBox(talk.bubble);
+        buried = covered(left, top, talk.bubble.w, talk.bubble.h) > 1;
+      }
+      if (talk.agent.mode !== 'talk' || !world.active || moved || buried || now >= talk.until) {
         this.stop(now);
       } else {
-        const { agent, bubble } = talk;
+        const { bubble } = talk;
         agent.pinX = world.x + talk.offX;
         agent.pinY = world.y + scrollY + talk.offY;
         agent.aimX = world.x;
@@ -120,7 +157,7 @@ export class Chatter {
 
     const { bubbles } = this.overlay;
     for (const bubble of bubbles) {
-      const target = bubble === this.talk?.bubble ? 1 : 0;
+      const target = bubble === this.talk?.bubble && this.talk.speaking ? 1 : 0;
       bubble.alpha += (target - bubble.alpha) * (1 - Math.exp(-(target ? 16 : 22) * dt));
     }
     for (let i = bubbles.length - 1; i >= 0; i--) {
@@ -128,7 +165,7 @@ export class Chatter {
     }
 
     if (this.talk || !world.active || world.lastMove <= 0 || document.hidden) return;
-    if (now - world.lastMove < FIRST_IDLE || now < this.nextAt) return;
+    if (now - world.lastMove < FIRST_IDLE || now - this.scrolledAt < SETTLED || now < this.nextAt) return;
     this.speak(now, world);
   }
 
@@ -216,7 +253,7 @@ export class Chatter {
     agent.mode = 'talk';
     const bubble: Bubble = { ...size, name, color: agent.color, text, x: agent.x, y: agent.y - scrollY, side, alpha: 0 };
     this.overlay.bubbles.push(bubble);
-    this.talk = { agent, bubble, offX, offY, fromX: world.x, fromY: world.y, until: now + holdFor(text) };
+    this.talk = { agent, bubble, offX, offY, fromX: world.x, fromY: world.y, fromScroll: scrollY, until: now + WALK, checkedAt: now, speaking: false };
     return true;
   }
 }

@@ -113,6 +113,14 @@ export interface Bubble {
   alpha: number;
 }
 
+/** Dónde queda el globito en pantalla: al costado de la punta del agente, siempre dentro de la ventana. */
+export function bubbleBox(b: Pick<Bubble, 'x' | 'y' | 'w' | 'h' | 'side'>): { left: number; top: number } {
+  return {
+    left: Math.min(Math.max(b.side === 1 ? b.x + 16 : b.x - 16 - b.w, 8), innerWidth - b.w - 8),
+    top: Math.min(Math.max(b.y - b.h / 2 + 4, 24), innerHeight - b.h - 8),
+  };
+}
+
 /** Línea de despacho: el cursor es el orquestador y cada agente sale con una orden. */
 export interface Tether {
   agent: Agent;
@@ -446,8 +454,7 @@ export class Overlay {
   private drawBubble(b: Bubble): void {
     if (b.alpha <= 0.01) return;
     const { ctx } = this;
-    const left = Math.min(Math.max(b.side === 1 ? b.x + 16 : b.x - 16 - b.w, 8), this.width - b.w - 8);
-    const top = Math.min(Math.max(b.y - b.h / 2 + 4, 24), this.height - b.h - 8);
+    const { left, top } = bubbleBox(b);
     const edge = b.side === 1 ? left : left + b.w;
     const tipY = Math.min(Math.max(b.y, top + 10), top + b.h - 10);
     const s = 0.94 + 0.06 * b.alpha;

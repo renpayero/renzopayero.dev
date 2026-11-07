@@ -371,7 +371,8 @@ export class Swarm {
       x: this.pointerX,
       y: this.pointerY,
       lastMove: this.lastMove,
-      active: this.orbitVisible && !this.halted && this.aura > 0.5,
+      // Charlan cuando no tienen trabajo: mientras construyen, lo que escriben aparecería debajo del globito.
+      active: this.orbitVisible && !this.halted && !this.busy && this.aura > 0.5,
     });
     for (let rest = dt; rest > 1e-5; rest -= STEP) this.update(Math.min(rest, STEP), now);
     this.aura += ((this.orbitVisible && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
