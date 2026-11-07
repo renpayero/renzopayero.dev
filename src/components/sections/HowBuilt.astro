@@ -1,5 +1,6 @@
 ---
 import { howBuilt } from '../../i18n/how-built';
+import { COLORS } from '../../swarm/crew';
 import type { Lang } from '../../i18n/ui';
 
 interface Props {
@@ -13,7 +14,10 @@ const t = howBuilt[Astro.props.lang];
     <div>
       <h2 class="h2" data-trace data-frame>{t.title}<br /><span class="tone">{t.tone}</span></h2>
       <p class="body-l how__text reveal" data-frame>{t.text}</p>
-      <button type="button" class="btn btn--primary how__cta reveal" data-autopilot data-js-only>{t.watch}</button>
+      <button type="button" class="btn btn--primary how__cta reveal" data-autopilot data-js-only>
+        <span class="how__crew" aria-hidden="true">{Object.values(COLORS).map((color, i) => <i style={`--c: ${color}; --i: ${i}`} />)}</span>
+        {t.watch}
+      </button>
     </div>
     <dl class="how__stats" data-telemetry>
       {
@@ -47,6 +51,51 @@ const t = howBuilt[Astro.props.lang];
   .how__cta {
     margin-top: 28px;
     cursor: pointer;
+  }
+
+  /* Los mismos agentes que muestra la píldora del build: al señalar el botón, se ponen de pie. */
+  .how__crew {
+    display: inline-flex;
+    margin-right: 12px;
+    padding-left: 2px;
+  }
+
+  .how__crew i {
+    width: 8px;
+    height: 8px;
+    margin-left: -2px;
+    border: 1px solid rgb(11 7 10 / 0.9);
+    border-radius: 50%;
+    background: var(--c);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .how__cta:focus-visible .how__crew i {
+      animation: crew-hop 460ms both;
+      animation-delay: calc(var(--i) * 45ms);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+    .how__cta:hover .how__crew i {
+      animation: crew-hop 460ms both;
+      animation-delay: calc(var(--i) * 45ms);
+    }
+  }
+
+  /* Sube frenando y cae como cae algo: una ola de saltos de 3 px, una vez por cada vez que se señala. */
+  @keyframes crew-hop {
+    0% {
+      transform: translateY(0);
+      animation-timing-function: var(--ease-entrada);
+    }
+    40% {
+      transform: translateY(-3px);
+      animation-timing-function: var(--ease-apple);
+    }
+    100% {
+      transform: translateY(0);
+    }
   }
 
   html:not([data-js]) [data-js-only] {
