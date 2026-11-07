@@ -487,3 +487,66 @@ test.describe('modo presentación', () => {
     expect(seconds).toBeLessThan(57);
   });
 });
+
+// Quien activa "reducir movimiento" con la página abierta tiene que quedar igual que si hubiera llegado así.
+test.describe('pedir menos movimiento con la página abierta', () => {
+  const calmPage = async (page: Page) => {
+    // Sin build (null) o con el build cerrado: lo único que esconde secciones es pending o running.
+    await expect
+      .poll(() => page.evaluate(() => ['pending', 'running'].includes(document.documentElement.dataset.build ?? '')))
+      .toBe(false);
+    if (await page.evaluate(() => document.documentElement.dataset.build === 'done')) {
+      expect(await page.locator('[data-section]:not([data-built])').count()).toBe(0);
+    }
+    // Lo que cuenta es lo que se ve: con movimiento reducido el CSS muestra todo aunque no tenga is-in.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('.reveal, [data-section]')]
+            .filter((el) => !el.matches('[data-gallery] .tile') && Number(getComputedStyle(el).opacity) < 0.99)
+            .map((el) => el.className),
+        ),
+      )
+      .toEqual([]);
+    await expect(page.locator('[data-hud]')).toBeHidden();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const swarm = (window as unknown as { __rpSwarm?: { agents: Array<{ alpha: number }> } }).__rpSwarm;
+          return swarm?.agents.every((a) => a.alpha < 0.01) ?? true;
+        }),
+      )
+      .toBe(true);
+    // Quieta de verdad: ni scroll automático ni videos.
+    const before = await page.evaluate(() => scrollY);
+    await page.waitForTimeout(800);
+    expect(await page.evaluate(() => scrollY)).toBe(before);
+    expect(await page.evaluate(() => [...document.querySelectorAll('video')].every((v) => v.paused))).toBe(true);
+  };
+
+  test('con la terminal abierta, queda la página terminada sin recordar una elección', async ({ page }) => {
+    await page.goto('/');
+    await answered(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('[data-gate-root]')).toHaveCount(0, { timeout: 3000 });
+    expect(await gateState(page)).toBeNull();
+    await expect(page.locator('.hero h1')).toBeVisible();
+    await calmPage(page);
+    expect(await page.evaluate(() => localStorage.getItem('rp-built'))).toBeNull();
+  });
+
+  test('a mitad del build, la página queda terminada y nada sigue moviéndose', async ({ page }) => {
+    await page.goto('/?build=1');
+    await page.waitForFunction(() => Boolean(window.__rpBuild?.timeline));
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await calmPage(page);
+  });
+
+  test('a mitad de la presentación, el scroll automático se detiene', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/?build=present');
+    await built(page, 'manifiesto', 20_000);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await calmPage(page);
+  });
+});

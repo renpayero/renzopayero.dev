@@ -47,6 +47,7 @@ class Director {
   private readonly text: HTMLElement | null;
   private readonly toggle: HTMLButtonElement | null;
   private readonly startWidth = innerWidth;
+  private readonly calm = matchMedia('(prefers-reduced-motion: reduce)');
 
   private active: ActiveBuild | null = null;
   private builtSeconds = 0;
@@ -109,6 +110,7 @@ class Director {
     hud.querySelector('[data-hud-skip]')?.addEventListener('click', () => this.skipAll());
     addEventListener('keydown', this.onKey);
     addEventListener('resize', this.onResize);
+    this.calm.addEventListener('change', this.onCalm);
   }
 
   begin(hero: HTMLElement): void {
@@ -352,6 +354,7 @@ class Director {
     this.finishMicros();
     removeEventListener('keydown', this.onKey);
     removeEventListener('resize', this.onResize);
+    this.calm.removeEventListener('change', this.onCalm);
     this.root.dataset.build = 'done';
     dispatchEvent(new Event('rp:release'));
     if (!ranFull) {
@@ -380,6 +383,11 @@ class Director {
       // Sin almacenamiento, la próxima visita vuelve a ver el build.
     }
   }
+
+  // Pedir menos movimiento con la página abierta vale lo mismo que llegar con esa preferencia.
+  private readonly onCalm = (event: MediaQueryListEvent): void => {
+    if (event.matches) this.skipAll();
+  };
 
   private readonly onKey = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') this.skipAll();

@@ -93,10 +93,11 @@ function open(gate: HTMLElement, screen: HTMLElement): void {
     return `${target === 'en' ? '/en/' : '/'}?build=${build}`;
   };
 
-  const launch = (chosen: BuildMode, target: Lang): void => {
+  const launch = (chosen: BuildMode, target: Lang, remember = true): void => {
     if (launched) return;
     launched = true;
     removeEventListener('keydown', onKey);
+    calm.removeEventListener('change', onCalm);
     tab('build')?.classList.add('is-done');
     tab('lang')?.classList.add('is-done');
 
@@ -110,7 +111,7 @@ function open(gate: HTMLElement, screen: HTMLElement): void {
     if (roster) roster.hidden = chosen === 'final';
     if (chosen !== 'final') assemble();
 
-    if (chosen === 'final') {
+    if (chosen === 'final' && remember) {
       // Eligió no ver la construcción: la próxima visita tampoco pregunta.
       try {
         localStorage.setItem(BUILT_KEY, String(Date.now()));
@@ -192,6 +193,13 @@ function open(gate: HTMLElement, screen: HTMLElement): void {
       option.addEventListener('click', () => choose(i));
     });
   }
+
+  // Pedir menos movimiento con la terminal abierta: queda la página terminada, en su idioma.
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  const onCalm = (event: MediaQueryListEvent): void => {
+    if (event.matches) launch('final', pageLang, false);
+  };
+  calm.addEventListener('change', onCalm);
 
   // Hasta acá llega el watchdog del head: la terminal ya responde.
   root.dataset.gateReady = '';

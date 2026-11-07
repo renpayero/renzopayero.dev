@@ -46,6 +46,7 @@ export class Swarm {
   readonly random = seeded(20261105);
   private readonly hasPointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
   private orbitVisible = this.hasPointer;
+  private halted = false;
 
   private pointerX = innerWidth / 2;
   private pointerY = innerHeight / 2;
@@ -107,6 +108,27 @@ export class Swarm {
     }
     addEventListener('resize', () => this.overlay.resize());
     if (this.hasPointer) this.listen();
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (event) => {
+      if (event.matches) this.halt();
+    });
+  }
+
+  /** Movimiento reducido a mitad de la visita: nada se mueve más, ni se desvanece de a poco. */
+  private halt(): void {
+    this.halted = true;
+    this.orbitVisible = false;
+    this.endInspection();
+    this.overlay.clear();
+    this.overlay.hoverFrames.length = 0;
+    this.overlay.ripples.length = 0;
+    this.overlay.tethers.length = 0;
+    this.leaving = [];
+    this.aura = 0;
+    for (const agent of this.agents) {
+      if (agent.mode !== 'task') agent.mode = 'orbit';
+      agent.alpha = 0;
+    }
+    this.start();
   }
 
   start(): void {
@@ -164,7 +186,7 @@ export class Swarm {
 
   /** El visitante puede ocultar la órbita; aun así, los agentes se ven mientras trabajan. */
   setOrbitVisible(visible: boolean): void {
-    this.orbitVisible = visible && this.hasPointer;
+    this.orbitVisible = visible && this.hasPointer && !this.halted;
     if (!this.orbitVisible) this.endInspection();
     this.start();
   }
@@ -383,7 +405,7 @@ export class Swarm {
 
     for (const agent of this.agents) {
       if (agent.mode === 'task') {
-        agent.alpha += (1 - agent.alpha) * (1 - Math.exp(-16 * dt));
+        agent.alpha = this.halted ? 0 : agent.alpha + (1 - agent.alpha) * (1 - Math.exp(-16 * dt));
         agent.depth += (0 - agent.depth) * (1 - Math.exp(-10 * dt));
       } else {
         if (agent.mode === 'orbit' && scrolled !== 0) {
@@ -417,7 +439,7 @@ export class Swarm {
         }
         agent.x += agent.vx * dt;
         agent.y += agent.vy * dt;
-        agent.alpha += ((agent.mode === 'pin' ? 1 : rest) - agent.alpha) * (1 - Math.exp(-8 * dt));
+        agent.alpha = this.halted ? 0 : agent.alpha + ((agent.mode === 'pin' ? 1 : rest) - agent.alpha) * (1 - Math.exp(-8 * dt));
       }
 
       // La flecha mira hacia donde va; cuando trabaja vuelve a ser un cursor; en una esquina apunta al objeto.

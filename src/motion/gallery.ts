@@ -1,6 +1,7 @@
 // Galería al estilo "Get the highlights": cada baldosa reproduce su video cuando está centrada,
 // la píldora muestra el progreso y al terminar pasa sola a la siguiente, salvo que se pause.
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const calm = matchMedia('(prefers-reduced-motion: reduce)');
+const reduced = calm.matches;
 
 // El momento dispositivo arranca una sola vez, al llegar al 70% de la pantalla, y queda en su último cuadro.
 const stage = document.querySelector<HTMLElement>('[data-device]');
@@ -24,6 +25,13 @@ if (stage && deviceVideo) {
       });
     };
     addEventListener('rp:release', play);
+    calm.addEventListener('change', (event) => {
+      if (!event.matches) return;
+      started = true;
+      deviceVideo.pause();
+      deviceVideo.poster = stage.dataset.final ?? deviceVideo.poster;
+      if (deviceVideo.duration) deviceVideo.currentTime = deviceVideo.duration;
+    });
     new IntersectionObserver(
       ([entry], observer) => {
         if (!entry?.isIntersecting) return;
@@ -99,6 +107,11 @@ for (const gallery of document.querySelectorAll<HTMLElement>('[data-gallery]')) 
   dots.forEach((dot, i) => dot.addEventListener('click', () => goTo(i)));
   toggle?.addEventListener('click', () => {
     playing = !playing;
+    sync();
+  });
+  calm.addEventListener('change', (event) => {
+    if (!event.matches) return;
+    playing = false;
     sync();
   });
 
