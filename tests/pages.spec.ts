@@ -246,3 +246,112 @@ test.describe('hablemos por WhatsApp', () => {
     await expect(mail).toHaveText('rpayerodev@gmail.com');
   });
 });
+
+// Regresión: lo último de la página nunca llegaba a la línea del 70% y quedaba invisible para siempre.
+// Según el alto de la ventana desaparecían los enlaces, los botones de contacto o hasta el texto.
+test.describe('nada queda invisible al recorrer la página', () => {
+  const SIZES = [
+    [2560, 1440],
+    [1920, 1080],
+    [1920, 855],
+    [1440, 1200],
+    [1440, 900],
+    [1536, 730],
+    [768, 1024],
+    [390, 844],
+    [390, 664],
+  ] as const;
+
+  /** Baja de a poco hasta el final, como una persona: cada paso deja que el navegador evalúe lo que entró. */
+  const walkToEnd = (page: Page, fromTop = false) =>
+    page.evaluate(async (restart) => {
+      document.documentElement.style.scrollBehavior = 'auto';
+      const frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (restart) scrollTo(0, 0);
+      await frames();
+      for (let y = scrollY; y < document.documentElement.scrollHeight; y += innerHeight * 0.5) {
+        scrollTo(0, y);
+        await frames();
+      }
+      scrollTo(0, document.documentElement.scrollHeight);
+    }, fromTop);
+
+  /** Las baldosas de la galería que están fuera de cuadro entran recién cuando la galería llega a ellas. */
+  const hidden = (page: Page, scope = 'body') =>
+    page.evaluate(
+      (root) =>
+        [...document.querySelectorAll(`${root} .reveal`)]
+          .filter((el) => !el.matches('[data-gallery] .tile') && Number(getComputedStyle(el).opacity) < 0.99)
+          .map((el) => el.className),
+      scope,
+    );
+
+  /** Lo que está al final de la página se tiene que ver al llegar, sin depender de haber pasado por lo demás. */
+  const expectContactVisible = async (page: Page) => {
+    await expect.poll(() => hidden(page, '#contacto'), { timeout: 4000 }).toEqual([]);
+    for (const selector of ['.contact__lit', '.contact__text', '.contact__cta .btn--primary', '.contact__links a']) {
+      await expect(page.locator(selector).first()).toBeInViewport();
+    }
+  };
+
+  const expectAllVisible = async (page: Page) => {
+    await expect.poll(() => hidden(page), { timeout: 4000 }).toEqual([]);
+    await expectContactVisible(page);
+  };
+
+  for (const [width, height] of SIZES) {
+    test(`${width}x${height}: en la visita repetida y sin build se ve todo`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto('/?build=0');
+      await walkToEnd(page, true);
+      await expectAllVisible(page);
+
+      await page.evaluate(() => localStorage.setItem('rp-built', String(Date.now())));
+      await page.goto('/');
+      expect(await page.evaluate(() => document.documentElement.dataset.build ?? null)).toBeNull();
+      await walkToEnd(page, true);
+      await expectAllVisible(page);
+    });
+  }
+
+  for (const [width, height] of [[1920, 1080], [390, 844]] as const) {
+    test(`${width}x${height}: scrolleando a mano mientras construyen se ve todo`, async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width, height });
+      await page.goto('/?build=1');
+      await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('.hero')?.dataset ?? {}), undefined, { timeout: 12_000 });
+      await walkToEnd(page);
+      await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('#contacto')?.dataset ?? {}), undefined, { timeout: 30_000 });
+      await expectContactVisible(page);
+      // Lo que quedó atrás a toda velocidad aparece cuando el visitante vuelve a pasar.
+      await walkToEnd(page, true);
+      await expectAllVisible(page);
+    });
+
+    test(`${width}x${height}: eligiendo la página terminada en la terminal se ve todo`, async ({ browser, baseURL }) => {
+      const context = await browser.newContext({ viewport: { width, height }, locale: 'es-AR' });
+      const page = await context.newPage();
+      await page.goto(`${baseURL}/`);
+      await page.waitForFunction(() => document.querySelector('.gate__screen[data-fast]') !== null);
+      await page.locator('.gate__screen:visible [data-step="build"] .gate__opt[data-value="final"]').click();
+      await page.locator('.gate__screen:visible [data-step="lang"] .gate__opt[data-value="es"]').click();
+      await expect(page.locator('[data-gate-root]')).toHaveCount(0, { timeout: 3000 });
+      await walkToEnd(page, true);
+      await expectAllVisible(page);
+      await context.close();
+    });
+  }
+
+  test('si la ventana crece estando abajo, lo que quedó fuera de la línea también aparece', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto('/?build=0');
+    await page.evaluate(() => {
+      document.documentElement.style.scrollBehavior = 'auto';
+      scrollTo(0, document.documentElement.scrollHeight - innerHeight - 500);
+    });
+    await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 1440, height: 1300 });
+    await walkToEnd(page);
+    await expectContactVisible(page);
+  });
+});

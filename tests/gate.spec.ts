@@ -465,6 +465,8 @@ test.describe('modo presentación', () => {
       expect(top, `${name} abajo`).toBeLessThan(vh * 0.8);
     }
     expect(await page.locator('[data-section]:not([data-built])').count()).toBe(0);
+    await expect.poll(() => page.locator('.reveal:not(.is-in):not([data-gallery] .tile)').count(), { timeout: 3000 }).toBe(0);
+    await expect(page.locator('.contact__links a').first()).toBeVisible();
     await expect(page.locator('[data-hud-text]')).toContainText(/Construido por \d+ agentes en \d+\.\d s/);
     // La partitura suma 54 s: el margen cubre la carga de la página y el arranque de las fuentes.
     expect(seconds).toBeGreaterThan(50);
