@@ -145,11 +145,12 @@ test.describe('la terminal de inicio', () => {
 test.describe('idioma de la terminal', () => {
   const matrix = [
     // La raíz no fue una elección: habla en el idioma del navegador. /en/ sí lo fue.
-    { path: '/', locale: 'es-AR', screen: 'es', other: 'en', goes: /\/en\/\?build=present$/ },
-    { path: '/', locale: 'en-US', screen: 'en', other: 'en', goes: /\/en\/\?build=present$/ },
-    { path: '/', locale: 'pt-BR', screen: 'en', other: 'es', goes: /:\d+\/$/ },
-    { path: '/en/', locale: 'es-AR', screen: 'en', other: 'es', goes: /:\d+\/\?build=present$/ },
-    { path: '/en/', locale: 'en-US', screen: 'en', other: 'en', goes: /\/en\/$/ },
+    // Ruta y parámetros, sin el host: vale igual en la copia local (con puerto) que en producción.
+    { path: '/', locale: 'es-AR', screen: 'es', other: 'en', goes: '/en/?build=present' },
+    { path: '/', locale: 'en-US', screen: 'en', other: 'en', goes: '/en/?build=present' },
+    { path: '/', locale: 'pt-BR', screen: 'en', other: 'es', goes: '/' },
+    { path: '/en/', locale: 'es-AR', screen: 'en', other: 'es', goes: '/?build=present' },
+    { path: '/en/', locale: 'en-US', screen: 'en', other: 'en', goes: '/en/' },
   ] as const;
 
   for (const { path, locale, screen, other, goes } of matrix) {
@@ -163,7 +164,7 @@ test.describe('idioma de la terminal', () => {
       await answered(page);
       await option(page, 'present').click();
       await option(page, other).click();
-      await page.waitForURL(goes, { timeout: 5000 });
+      await page.waitForURL((url) => url.pathname + url.search === goes, { timeout: 5000 });
       await page.waitForFunction(() => document.documentElement.dataset.build === 'running', undefined, { timeout: 8000 });
       await expect.poll(() => gateState(page)).toBeNull();
       expect(await page.evaluate(() => document.documentElement.dataset.pilot)).toBe('present');
