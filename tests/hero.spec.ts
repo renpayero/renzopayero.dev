@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { chatter } from '../src/i18n/chatter';
+import { dealer } from '../src/swarm/chatter';
 
 const HIDE_TOOLS = '.hud, .hud-replay, canvas { display: none !important; }';
 
@@ -431,7 +433,8 @@ test.describe('enjambre', () => {
     await page.waitForTimeout(1200);
     const { agents, scroll } = await read(page);
     for (const agent of agents) {
-      expect(agent.mode).toBe('orbit');
+      // Con el cursor quieto uno puede haber salido a hablar: también es estar de vuelta.
+      expect(['orbit', 'talk']).toContain(agent.mode);
       expect(Math.hypot(agent.x - 6, agent.y - scroll - 302)).toBeLessThan(230);
     }
   });
@@ -588,5 +591,145 @@ test.describe('rendimiento', () => {
       expect(m.cls).toBeLessThan(0.02);
       await context.close();
     }
+  });
+});
+
+test.describe('los agentes hablan', () => {
+  interface TalkView {
+    bubbles: Array<{ text: string; alpha: number; x: number; y: number; w: number; h: number; side: number }>;
+    talking: Array<{ x: number; y: number }>;
+    scroll: number;
+  }
+  const talk = (page: Page) =>
+    page.evaluate((): TalkView => {
+      const swarm = (window as unknown as { __rpSwarm?: { overlay: { bubbles: TalkView['bubbles'] }; agents: Array<{ mode: string; x: number; y: number }> } })
+        .__rpSwarm;
+      return {
+        bubbles: swarm?.overlay.bubbles.map(({ text, alpha, x, y, w, h, side }) => ({ text, alpha, x, y, w, h, side })) ?? [],
+        talking: swarm?.agents.filter((a) => a.mode === 'talk').map(({ x, y }) => ({ x, y })) ?? [],
+        scroll: scrollY,
+      };
+    });
+  const still = async (page: Page, x: number, y: number) => {
+    await page.mouse.move(x - 2, y - 2);
+    await page.mouse.move(x, y);
+  };
+  const said = async (page: Page) => {
+    await expect.poll(async () => (await talk(page)).bubbles.filter((b) => b.alpha > 0.9).length, { timeout: 7000 }).toBe(1);
+    return talk(page);
+  };
+  const fixed = (lines: ReadonlyArray<{ text: unknown }>) => lines.flatMap((l) => (typeof l.text === 'string' ? [l.text] : []));
+
+  test.beforeEach(({ isMobile, viewport }) => {
+    test.skip(isMobile === true || (viewport?.width ?? 0) < 1024, 'necesita puntero y lugar al costado del cursor');
+  });
+
+  test('con el cursor quieto, uno sale a hablar al costado y vuelve cuando el cursor se mueve', async ({ page }) => {
+    await page.goto('/?build=0');
+    await still(page, 820, 520);
+    await page.waitForTimeout(3000);
+    expect((await talk(page)).bubbles).toHaveLength(0);
+    const view = await said(page);
+    const idle = chatter.es.idle;
+    const text = view.bubbles[0]?.text ?? '';
+    expect(fixed(idle).includes(text) || /^Somos \d+ y nadie|^El texto más tenue da \d/.test(text)).toBe(true);
+    expect(view.talking).toHaveLength(1);
+    const agent = view.talking[0] ?? { x: 0, y: 0 };
+    const distance = Math.hypot(agent.x - 820, agent.y - view.scroll - 520);
+    expect(distance).toBeGreaterThan(100);
+    expect(distance).toBeLessThan(200);
+
+    await page.mouse.move(880, 560, { steps: 3 });
+    await expect.poll(async () => (await talk(page)).talking.length).toBe(0);
+    await expect.poll(async () => (await talk(page)).bubbles.length).toBe(0);
+  });
+
+  test('el globito no tapa el texto que está al lado del cursor', async ({ page }) => {
+    await page.goto('/?build=0');
+    await still(page, 820, 520);
+    const view = await said(page);
+    const bubble = view.bubbles[0];
+    if (!bubble) throw new Error('sin globito');
+    // La misma cuenta que usa el overlay para dibujarlo.
+    const left = bubble.side === 1 ? bubble.x + 16 : bubble.x - 16 - bubble.w;
+    const rect = { left, top: bubble.y - bubble.h / 2 + 4, right: left + bubble.w, bottom: bubble.y + bubble.h / 2 + 4 };
+    const overlaps = await page.evaluate((r) => {
+      const hits: string[] = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const box of range.getClientRects()) {
+          if (box.right > r.left && box.left < r.right && box.bottom > r.top && box.top < r.bottom) hits.push(node.textContent.trim().slice(0, 30));
+        }
+      }
+      return hits;
+    }, rect);
+    expect(overlaps).toEqual([]);
+  });
+
+  test('en la terminal hablan de la terminal, y en inglés hablan en inglés', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => document.querySelector('.gate__screen[data-fast]') !== null);
+    await still(page, 1000, 700);
+    // La terminal habla el idioma del navegador, y ellos también.
+    const gate = (await page.evaluate(() => document.documentElement.dataset.gate)) === 'es' ? 'es' : 'en';
+    expect(fixed(chatter[gate].gate)).toContain((await said(page)).bubbles[0]?.text);
+
+    await page.goto('/en/?build=0');
+    await still(page, 820, 520);
+    const text = (await said(page)).bubbles[0]?.text ?? '';
+    expect(fixed(chatter.en.idle).includes(text) || /^\d+ agents and nobody|^The faintest text is \d/.test(text)).toBe(true);
+  });
+
+  test('con la órbita apagada nadie habla', async ({ page }) => {
+    await page.goto('/?build=0');
+    await still(page, 820, 520);
+    await page.locator('[data-swarm-toggle]').click();
+    await still(page, 820, 520);
+    await page.waitForTimeout(5500);
+    expect((await talk(page)).bubbles).toHaveLength(0);
+  });
+
+  test('cada mazo se reparte sin repetir hasta agotarse, y nunca dos veces seguidas la misma', () => {
+    let seed = 7;
+    const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    for (const deck of [chatter.es.idle, chatter.en.idle, chatter.es.gate]) {
+      const draw = dealer(deck, random);
+      let previous: unknown;
+      for (let round = 0; round < 4; round++) {
+        const seen = new Set<unknown>();
+        for (let i = 0; i < deck.length; i++) {
+          const card = draw();
+          expect(card).not.toBe(previous);
+          seen.add(card);
+          previous = card;
+        }
+        expect(seen.size).toBe(deck.length);
+      }
+    }
+  });
+});
+
+test.describe('reglas', () => {
+  const tools = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __rpSwarm?: { overlay: { tools: number } } }).__rpSwarm?.overlay.tools ?? 0);
+
+  test('aparecen mientras construyen y se van cuando terminan', async ({ page }) => {
+    await page.goto('/?build=1');
+    await page.waitForFunction(() => Boolean(window.__rpBuild?.timeline));
+    await expect.poll(() => tools(page)).toBeGreaterThan(0.9);
+    await heroBuilt(page);
+    await page.keyboard.press('Escape');
+    await expect.poll(() => tools(page), { timeout: 4000 }).toBeLessThan(0.02);
+  });
+
+  test('en la página terminada no aparecen', async ({ page }) => {
+    await page.goto('/?build=0');
+    await page.mouse.move(400, 300);
+    await page.mouse.move(402, 302);
+    await page.waitForTimeout(800);
+    expect(await tools(page)).toBeLessThan(0.02);
   });
 });

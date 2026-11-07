@@ -1,5 +1,6 @@
 import { ui, type Lang, type RoleId } from '../i18n/ui';
 import { COLORS, crewFor } from './crew';
+import { Chatter } from './chatter';
 import { Overlay, RIPPLE_LIFE, TRAIL, type Agent, type Frame } from './overlay';
 
 /**
@@ -62,6 +63,7 @@ export class Swarm {
   private busy = 0;
   private inspection: Inspection | null = null;
   private leaving: Frame[] = [];
+  private readonly chatter: Chatter;
 
   constructor() {
     const lang: Lang = document.documentElement.lang === 'en' ? 'en' : 'es';
@@ -106,6 +108,7 @@ export class Swarm {
         index++;
       }
     }
+    this.chatter = new Chatter(this.overlay, this.random, lang);
     addEventListener('resize', () => this.overlay.resize());
     if (this.hasPointer) this.listen();
     matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (event) => {
@@ -122,6 +125,7 @@ export class Swarm {
     this.overlay.hoverFrames.length = 0;
     this.overlay.ripples.length = 0;
     this.overlay.tethers.length = 0;
+    this.overlay.bubbles.length = 0;
     this.leaving = [];
     this.aura = 0;
     for (const agent of this.agents) {
@@ -178,6 +182,7 @@ export class Swarm {
   /** Mientras construyen, nadie se distrae inspeccionando lo que toca el cursor. */
   setBusy(busy: boolean): void {
     this.busy = busy ? 1 : 0;
+    this.overlay.setTooling(busy);
     if (busy) {
       this.endInspection();
       this.start();
@@ -360,6 +365,13 @@ export class Swarm {
     this.lastFrame = now;
     this.time += dt;
     this.trackTasks(dt);
+    this.chatter.update(now, dt, {
+      agents: this.agents,
+      x: this.pointerX,
+      y: this.pointerY,
+      lastMove: this.lastMove,
+      active: this.orbitVisible && !this.halted && this.aura > 0.5,
+    });
     for (let rest = dt; rest > 1e-5; rest -= STEP) this.update(Math.min(rest, STEP), now);
     this.aura += ((this.orbitVisible && this.lastMove > 0 ? 1 : 0) - this.aura) * (1 - Math.exp(-4 * dt));
     this.overlay.render(this.agents, this.pointerX, this.pointerY, this.aura * (0.8 + this.energy * 0.4), dt);
@@ -408,7 +420,7 @@ export class Swarm {
         agent.alpha = this.halted ? 0 : agent.alpha + (1 - agent.alpha) * (1 - Math.exp(-16 * dt));
         agent.depth += (0 - agent.depth) * (1 - Math.exp(-10 * dt));
       } else {
-        if (agent.mode === 'orbit' && scrolled !== 0) {
+        if ((agent.mode === 'orbit' || agent.mode === 'talk') && scrolled !== 0) {
           agent.y += scrolled;
           for (let i = 0; i < TRAIL; i++) agent.trailY[i] = (agent.trailY[i] ?? 0) + scrolled;
         }
@@ -416,7 +428,7 @@ export class Swarm {
         let targetX: number;
         let targetY: number;
         let depth = 0;
-        if (agent.mode === 'pin') {
+        if (agent.mode === 'pin' || agent.mode === 'talk') {
           targetX = agent.pinX;
           targetY = agent.pinY;
         } else {
@@ -428,7 +440,8 @@ export class Swarm {
           targetY = anchorY + ox * Math.sin(agent.spin) + oy * Math.cos(agent.spin);
         }
         agent.depth += (depth - agent.depth) * (1 - Math.exp(-10 * dt));
-        const k = agent.mode === 'pin' ? 170 : agent.stiffness;
+        // El que sale a hablar camina más tranquilo que el que salta a una esquina.
+        const k = agent.mode === 'pin' ? 170 : agent.mode === 'talk' ? 110 : agent.stiffness;
         const c = 2 * Math.sqrt(k) * 0.74;
         agent.vx += (k * (targetX - agent.x) - c * agent.vx) * dt;
         agent.vy += (k * (targetY - agent.y) - c * agent.vy) * dt;
@@ -445,7 +458,7 @@ export class Swarm {
       // La flecha mira hacia donde va; cuando trabaja vuelve a ser un cursor; en una esquina apunta al objeto.
       let heading = 0;
       const moving = Math.hypot(agent.vx, agent.vy);
-      if (agent.mode === 'pin') heading = Math.atan2(agent.aimY - agent.y, agent.aimX - agent.x) - TIP_HEADING;
+      if (agent.mode === 'pin' || agent.mode === 'talk') heading = Math.atan2(agent.aimY - agent.y, agent.aimX - agent.x) - TIP_HEADING;
       else if (moving > 60) heading = Math.atan2(agent.vy, agent.vx) - TIP_HEADING;
       agent.angle += shortest(agent.angle, heading) * (1 - Math.exp(-14 * dt));
 

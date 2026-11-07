@@ -1,6 +1,7 @@
 import type { RoleId } from '../i18n/ui';
 
-export type AgentMode = 'orbit' | 'task' | 'pin';
+/** orbit: lo mueve la física; task: el timeline; pin: fijo en un punto; talk: al costado del cursor, hablando. */
+export type AgentMode = 'orbit' | 'task' | 'pin' | 'talk';
 
 export const TRAIL = 14;
 const TETHER_LIFE = 0.5;
@@ -97,6 +98,21 @@ export interface Ripple {
   age: number;
 }
 
+/** Lo que dice un agente: se dibuja junto a su punta, del lado opuesto al cursor. */
+export interface Bubble {
+  name: string;
+  color: string;
+  text: string;
+  lines: string[];
+  w: number;
+  h: number;
+  /** Punta del agente, en pantalla. */
+  x: number;
+  y: number;
+  side: 1 | -1;
+  alpha: number;
+}
+
 /** Línea de despacho: el cursor es el orquestador y cada agente sale con una orden. */
 export interface Tether {
   agent: Agent;
@@ -110,6 +126,11 @@ const ARROW = 'M0 0 L0 15.5 L4.2 11.8 L6.9 18 L9.9 16.7 L7.2 10.7 L12.6 10.4 Z';
 const SPRITE_SIZE = 56;
 const SPRITE_ORIGIN = 20;
 const RIPPLE_LIFE = 0.55;
+const SURFACE = 'rgba(24, 19, 23, 0.95)';
+const TICK = 'rgba(143, 143, 143, 0.6)';
+// Después de una sección las reglas esperan un poco: entre dos secciones seguidas no parpadean.
+const RULER_HOLD = 1.5;
+const BUBBLE = { pad: 11, line: 17, nameLine: 15, maxText: 220, radius: 10 };
 
 export class Overlay {
   readonly frames: Frame[] = [];
@@ -120,6 +141,7 @@ export class Overlay {
   readonly tethers: Tether[] = [];
   readonly traces: Trace[] = [];
   readonly arcs: Arc[] = [];
+  readonly bubbles: Bubble[] = [];
   /** Corrimiento de la escena fija respecto de cuando se midió: las herramientas la acompañan. */
   dx = 0;
   dy = 0;
@@ -128,6 +150,11 @@ export class Overlay {
   private readonly canvas = document.createElement('canvas');
   private readonly ctx: CanvasRenderingContext2D;
   private readonly mono: string;
+  private readonly sans: string;
+  private tooling = false;
+  private toolsOffAt = -Infinity;
+  private tools = 0;
+  private clock = 0;
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private dpr = 1;
   private width = 0;
@@ -137,7 +164,9 @@ export class Overlay {
     const ctx = this.canvas.getContext('2d');
     if (!ctx) throw new Error('canvas 2d no disponible');
     this.ctx = ctx;
-    this.mono = getComputedStyle(document.documentElement).getPropertyValue('--font-geist') || 'monospace';
+    const vars = getComputedStyle(document.documentElement);
+    this.mono = vars.getPropertyValue('--font-geist') || 'monospace';
+    this.sans = vars.getPropertyValue('--font-inter') || 'system-ui';
     this.canvas.setAttribute('aria-hidden', 'true');
     this.canvas.dataset.swarm = '';
     this.canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:40;pointer-events:none';
@@ -160,6 +189,38 @@ export class Overlay {
     this.notes.length = 0;
     this.traces.length = 0;
     this.arcs.length = 0;
+  }
+
+  /** Mientras se construye una sección aparecen las reglas, como en una herramienta de diseño. */
+  setTooling(busy: boolean): void {
+    if (this.tooling && !busy) this.toolsOffAt = this.clock;
+    this.tooling = busy;
+  }
+
+  /** Corta la frase en renglones que entran en el globito. */
+  measureBubble(name: string, text: string): Pick<Bubble, 'lines' | 'w' | 'h'> {
+    const { ctx } = this;
+    ctx.font = `500 13px ${this.sans}`;
+    const lines: string[] = [];
+    let current = '';
+    for (const word of text.split(' ')) {
+      const next = current ? `${current} ${word}` : word;
+      if (current && ctx.measureText(next).width > BUBBLE.maxText) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    if (current) lines.push(current);
+    const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+    ctx.font = `600 9.5px ${this.mono}`;
+    const nameW = ctx.measureText(name).width;
+    return {
+      lines,
+      w: Math.ceil(Math.max(widest, nameW) + BUBBLE.pad * 2),
+      h: Math.ceil(BUBBLE.pad * 1.5 + BUBBLE.nameLine + lines.length * BUBBLE.line),
+    };
   }
 
   setAnchor(el: Element | null): void {
@@ -276,6 +337,9 @@ export class Overlay {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
     const scroll = scrollY;
+    this.clock += dt;
+    const want = this.tooling || this.clock - this.toolsOffAt < RULER_HOLD ? 1 : 0;
+    this.tools += (want - this.tools) * (1 - Math.exp(-(want ? 10 : 6) * dt));
     this.drawAura(anchorX, anchorY, aura);
     for (const tether of this.tethers) tether.age += dt;
     while (this.tethers[0] && this.tethers[0].age >= TETHER_LIFE) this.tethers.shift();
@@ -295,6 +359,7 @@ export class Overlay {
     this.drawRipples(scroll);
     ctx.restore();
     for (const frame of this.hoverFrames) this.drawFrame(frame, scroll);
+    this.drawRulers(scroll);
 
     ctx.globalCompositeOperation = 'lighter';
     for (const agent of agents) this.drawTrail(agent, scroll);
@@ -302,6 +367,114 @@ export class Overlay {
     // Los que pasan por detrás se pintan primero: la profundidad también es orden.
     const ordered = agents.slice().sort((a, b) => a.depth - b.depth);
     for (const agent of ordered) this.drawAgent(agent, scroll);
+    for (const bubble of this.bubbles) this.drawBubble(bubble);
+  }
+
+  /**
+   * Reglas arriba y a la izquierda, con medidas reales de la página: la de la izquierda cuenta desde
+   * el principio del documento. Lo que se está construyendo se marca en las dos, como una selección.
+   */
+  private drawRulers(scroll: number): void {
+    const a = this.tools;
+    if (a <= 0.01) return;
+    const { ctx } = this;
+    const t = this.width < 768 ? 14 : 16;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(11, 7, 10, 0.82)';
+    ctx.fillRect(0, 0, this.width, t);
+    ctx.fillRect(0, t, t, this.height - t);
+
+    ctx.fillStyle = CHIP;
+    for (const f of this.frames) {
+      if (f.alpha <= 0.02 || f.grow <= 0) continue;
+      ctx.globalAlpha = a * Math.min(f.alpha, 1) * 0.55;
+      ctx.fillRect(Math.max(f.x + this.dx, t), 0, f.w * f.grow, t);
+      ctx.fillRect(0, Math.max(f.y + this.dy - scroll, t), t, f.h * f.grow);
+    }
+    ctx.globalAlpha = a;
+
+    ctx.strokeStyle = TICK;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const tick = (n: number): number => (n % 100 === 0 ? 0.6 : n % 50 === 0 ? 0.38 : 0.2) * t;
+    for (let x = Math.ceil(t / 10) * 10; x < this.width; x += 10) {
+      ctx.moveTo(x + 0.5, t);
+      ctx.lineTo(x + 0.5, t - tick(x));
+    }
+    for (let y = Math.ceil((scroll + t) / 10) * 10; y < scroll + this.height; y += 10) {
+      const sy = Math.round(y - scroll) + 0.5;
+      ctx.moveTo(t, sy);
+      ctx.lineTo(t - tick(y), sy);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(${LINE}, 0.28)`;
+    ctx.beginPath();
+    ctx.moveTo(0, t - 0.5);
+    ctx.lineTo(this.width, t - 0.5);
+    ctx.moveTo(t - 0.5, t);
+    ctx.lineTo(t - 0.5, this.height);
+    ctx.stroke();
+
+    ctx.font = `500 8px ${this.mono}`;
+    ctx.fillStyle = TICK;
+    ctx.textBaseline = 'top';
+    for (let x = 100; x < this.width; x += 100) ctx.fillText(String(x), x + 3, 2);
+    for (let y = Math.ceil((scroll + t + 30) / 100) * 100; y < scroll + this.height; y += 100) {
+      ctx.save();
+      ctx.translate(2, y - scroll - 3);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(String(y), 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  /** Aparece desde la punta del agente y crece apenas: de 94% a 100%, nunca desde cero. */
+  private drawBubble(b: Bubble): void {
+    if (b.alpha <= 0.01) return;
+    const { ctx } = this;
+    const left = Math.min(Math.max(b.side === 1 ? b.x + 16 : b.x - 16 - b.w, 8), this.width - b.w - 8);
+    const top = Math.min(Math.max(b.y - b.h / 2 + 4, 24), this.height - b.h - 8);
+    const edge = b.side === 1 ? left : left + b.w;
+    const tipY = Math.min(Math.max(b.y, top + 10), top + b.h - 10);
+    const s = 0.94 + 0.06 * b.alpha;
+    ctx.save();
+    ctx.globalAlpha = b.alpha;
+    ctx.translate(edge, tipY);
+    ctx.scale(s, s);
+    ctx.translate(-edge, -tipY);
+
+    ctx.beginPath();
+    ctx.roundRect(left, top, b.w, b.h, BUBBLE.radius);
+    ctx.fillStyle = SURFACE;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${LINE}, 0.4)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // La cola tapa el borde donde nace y solo dibuja sus dos lados.
+    ctx.beginPath();
+    ctx.moveTo(edge + b.side, tipY - 5);
+    ctx.lineTo(edge - 6 * b.side, tipY);
+    ctx.lineTo(edge + b.side, tipY + 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(edge, tipY - 5);
+    ctx.lineTo(edge - 6 * b.side, tipY);
+    ctx.lineTo(edge, tipY + 5);
+    ctx.stroke();
+
+    ctx.textBaseline = 'top';
+    ctx.font = `600 9.5px ${this.mono}`;
+    ctx.fillStyle = b.color;
+    ctx.fillText(b.name, left + BUBBLE.pad, top + BUBBLE.pad * 0.75);
+    ctx.font = `500 13px ${this.sans}`;
+    ctx.fillStyle = INK;
+    b.lines.forEach((line, i) => {
+      ctx.fillText(line, left + BUBBLE.pad, top + BUBBLE.pad * 0.75 + BUBBLE.nameLine + i * BUBBLE.line);
+    });
+    ctx.restore();
   }
 
   private drawTrail(a: Agent, scroll: number): void {
