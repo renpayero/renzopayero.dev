@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const SLUGS = ['legacy', 'dakodev', 'betina', 'quantarax', 'rodri'];
 const PAGES = ['/', '/en/', ...SLUGS.flatMap((s) => [`/proyectos/${s}/`, `/en/proyectos/${s}/`])];
@@ -154,5 +154,95 @@ test.describe('build completo', () => {
     await page.waitForTimeout(700);
     const y2 = await page.evaluate(() => scrollY);
     expect(Math.abs(y2 - y1)).toBeLessThan(3);
+  });
+});
+
+test.describe('hablemos por WhatsApp', () => {
+  const NUMBER = '5492477610100';
+  const CASES = [
+    { path: '/', message: 'Hola Renzo, vi tu portfolio y me gustaría hablar con vos.' },
+    { path: '/en/', message: "Hi Renzo, I saw your portfolio and I'd like to talk." },
+  ];
+  const LINK = '.contact__title a';
+  const WRITE = '.contact__cta .btn--primary';
+  const expectWhatsapp = (href: string | null | undefined, message: string) => {
+    const url = new URL(href ?? 'about:blank');
+    expect(url.origin + url.pathname).toBe(`https://wa.me/${NUMBER}`);
+    expect(url.searchParams.get('text')).toBe(message);
+  };
+  // WhatsApp no se visita de verdad: alcanza con ver a dónde iría el visitante.
+  const stubWhatsapp = (context: BrowserContext) =>
+    context.route('https://wa.me/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: 'ok' }));
+  // Un clic de mouse de verdad: el de locator acomoda el scroll justo antes y falsea lo que se mide.
+  const aim = async (page: Page, selector: string): Promise<() => Promise<void>> => {
+    const target = page.locator(selector);
+    await target.click({ trial: true });
+    const box = await target.boundingBox();
+    return () => page.mouse.click((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
+  };
+  const opensWhatsapp = async (page: Page, message: string, action: () => Promise<void>) => {
+    const y = await page.evaluate(() => scrollY);
+    const [popup] = await Promise.all([page.waitForEvent('popup'), action()]);
+    expectWhatsapp(popup.url(), message);
+    await popup.close();
+    expect(page.url()).not.toContain('wa.me');
+    expect(await page.evaluate(() => scrollY)).toBe(y);
+  };
+
+  for (const { path, message } of CASES) {
+    test(`${path}: el texto grande y el botón de escribir llevan el número y el mensaje en su idioma`, async ({ page }) => {
+      await page.goto(`${path}?build=0`);
+      for (const [selector, shown] of [[LINK, '.contact__lit'], [WRITE, WRITE]] as const) {
+        const link = page.locator(selector);
+        await expect(link).toHaveCount(1);
+        expectWhatsapp(await link.getAttribute('href'), message);
+        await expect(link).toHaveAttribute('target', '_blank');
+        await expect(link).toHaveAttribute('rel', /noopener/);
+        // El nombre para lectores de pantalla arranca con lo que se ve: WCAG 2.5.3.
+        const visible = (await page.locator(shown).innerText()).trim().replace(/\.$/, '');
+        expect(await link.getAttribute('aria-label')).toMatch(new RegExp(`^${visible}.*WhatsApp$`));
+      }
+    });
+
+    test(`${path}: con clic y con teclado abre WhatsApp aparte y la página no se mueve`, async ({ page, context, isMobile }) => {
+      await stubWhatsapp(context);
+      await page.goto(`${path}?build=0`);
+      // Con el scroll suave, Playwright seguiría llegando al botón mientras se mide si la página se movió.
+      await page.addStyleTag({ content: 'html { scroll-behavior: auto !important; }' });
+      const link = page.locator(LINK);
+      await link.scrollIntoViewIfNeeded();
+      await expect(page.locator('.contact__lit')).toBeVisible();
+      await opensWhatsapp(page, message, await aim(page, LINK));
+      await opensWhatsapp(page, message, await aim(page, WRITE));
+      test.skip(isMobile === true, 'el resto es de teclado');
+      await link.focus();
+      await opensWhatsapp(page, message, () => page.keyboard.press('Enter'));
+    });
+  }
+
+  test('también funciona después de que lo construyen los agentes', async ({ page, context }) => {
+    test.setTimeout(60_000);
+    await stubWhatsapp(context);
+    await page.goto('/?build=1');
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('.hero')?.dataset ?? {}), undefined, { timeout: 12_000 });
+    await page.evaluate(() => {
+      document.documentElement.style.scrollBehavior = 'auto';
+      document.querySelector('#contacto')?.scrollIntoView();
+    });
+    await page.waitForFunction(() => 'built' in (document.querySelector<HTMLElement>('#contacto')?.dataset ?? {}), undefined, { timeout: 12_000 });
+    await expect(page.locator('.contact__lit')).toHaveCSS('opacity', '1');
+    for (const selector of [LINK, WRITE]) {
+      await opensWhatsapp(page, CASES[0]!.message, await aim(page, selector));
+    }
+  });
+
+  test('lo demás sigue igual: los botones van a la sección y la dirección de mail sigue ahí', async ({ page }) => {
+    await page.goto('/?build=0');
+    for (const selector of ['.topbar__cta', '.localnav__cta', '.hero .cta .btn:not(.btn--primary)']) {
+      await expect(page.locator(selector)).toHaveAttribute('href', '#contacto');
+    }
+    const mail = page.locator('#contacto a[href^="mailto:"]');
+    await expect(mail).toHaveCount(1);
+    await expect(mail).toHaveText('rpayerodev@gmail.com');
   });
 });

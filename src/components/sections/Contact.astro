@@ -1,25 +1,29 @@
 ---
 import { content } from '../../i18n/content';
 import type { Lang } from '../../i18n/ui';
+import { whatsapp } from '../../lib/contact';
 
 interface Props {
   lang: Lang;
 }
 
 const c = content[Astro.props.lang].contact;
+const wa = whatsapp(Astro.props.lang);
 const EMAIL = 'rpayerodev@gmail.com';
 ---
 <section id="contacto" class="section contact" data-section="contacto">
   <div class="contact__glow" aria-hidden="true"></div>
   <div class="wrap contact__inner">
     <h2 class="contact__title" data-live data-frame>
-      <span class="contact__halo" aria-hidden="true">{c.title}</span>
-      <span class="contact__halo contact__halo--near" aria-hidden="true">{c.title}</span>
-      <span class="contact__lit" data-trace>{c.title}</span>
+      <a class="contact__link" href={wa.href} target="_blank" rel="noopener" aria-label={wa.labels.talk}>
+        <span class="contact__halo" aria-hidden="true">{c.title}</span>
+        <span class="contact__halo contact__halo--near" aria-hidden="true">{c.title}</span>
+        <span class="contact__lit" data-trace>{c.title}</span>
+      </a>
     </h2>
     <p class="body-l contact__text reveal" data-frame>{c.text}</p>
     <div class="cta contact__cta reveal" data-frame>
-      <a class="btn btn--primary" href={`mailto:${EMAIL}`}>{c.write}</a>
+      <a class="btn btn--primary" href={wa.href} target="_blank" rel="noopener" aria-label={wa.labels.write}>{c.write}</a>
       <a class="btn" href="/cv/renzo-payero-cv-es.pdf" download>{c.cvEs}</a>
       <a class="btn" href="/cv/renzo-payero-cv-en.pdf" download>{c.cvEn}</a>
     </div>
@@ -64,6 +68,35 @@ const EMAIL = 'rpayerodev@gmail.com';
     letter-spacing: -0.035em;
     font-variation-settings: 'opsz' 32;
     position: relative;
+  }
+
+  /* En reposo no cambia nada del neón: al pasar el cursor se enciende un poco más. */
+  .contact__link {
+    display: block;
+    border-radius: 12px;
+    transition:
+      transform 0.32s var(--ease-apple),
+      filter 0.32s var(--ease-apple);
+  }
+
+  @media (hover: hover) {
+    .contact__link:hover {
+      filter: brightness(1.2);
+      transform: scale(1.012);
+    }
+  }
+
+  .contact__link:active {
+    transform: scale(0.985);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .contact__link,
+    .contact__link:hover,
+    .contact__link:active {
+      transition: none;
+      transform: none;
+    }
   }
 
   .contact__lit {
