@@ -1,5 +1,8 @@
 import type { Lang } from '../i18n/ui';
 
+export const EMAIL = 'rpayerodev@gmail.com';
+export const LINKEDIN = 'https://www.linkedin.com/in/renzopayero/';
+
 /** Formato de wa.me: internacional, solo dígitos y con el 9 de los celulares argentinos. */
 const WHATSAPP_NUMBER = '5492477610100';
 

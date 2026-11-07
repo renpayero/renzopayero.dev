@@ -66,6 +66,26 @@ test.describe('idiomas y SEO', () => {
     expect((await request.get('/no-existe')).status()).toBe(404);
   });
 
+  test('llms.txt resume la página para asistentes de IA, con enlaces que existen', async ({ request, baseURL }) => {
+    const res = await request.get('/llms.txt');
+    expect(res.status()).toBe(200);
+    const type = res.headers()['content-type'] ?? '';
+    expect(type).toContain('text/plain');
+    // En producción lo sirve nginx: sin charset, los acentos se ven rotos en el navegador.
+    if (baseURL?.startsWith('https')) expect(type).toContain('utf-8');
+    const text = await res.text();
+    expect(text.startsWith('# Renzo Payero\n\n> ')).toBe(true);
+    for (const name of ['Legacy Hair Studio', 'Dakodev', 'Betina Di Luzio', 'QuantaraX', 'Rodri Companion', 'Schneider SRL']) {
+      expect(text).toContain(name);
+    }
+    expect(text).toContain('(demo en desarrollo)');
+    expect(text).toContain('https://wa.me/5492477610100?text=');
+    expect(text).not.toMatch(/undefined|\[object|DakoAgent|[—–]/);
+    const own = [...text.matchAll(/\((https:\/\/renzopayero\.dev[^)]*)\)/g)].map((m) => new URL(m[1] ?? '').pathname);
+    expect(own.length).toBeGreaterThan(12);
+    for (const path of new Set(own)) expect((await request.get(path)).status(), path).toBe(200);
+  });
+
   test('los datos de "Cómo se hizo" son reales y salen del build', async ({ request }) => {
     const stats = await (await request.get('/build-stats.json')).json();
     expect(stats.jsKb).toBeGreaterThan(5);

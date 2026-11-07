@@ -1,7 +1,7 @@
 ---
 import { content } from '../../i18n/content';
 import type { Lang } from '../../i18n/ui';
-import { whatsapp } from '../../lib/contact';
+import { EMAIL, LINKEDIN, whatsapp } from '../../lib/contact';
 
 interface Props {
   lang: Lang;
@@ -9,7 +9,6 @@ interface Props {
 
 const c = content[Astro.props.lang].contact;
 const wa = whatsapp(Astro.props.lang);
-const EMAIL = 'rpayerodev@gmail.com';
 ---
 <section id="contacto" class="section contact" data-section="contacto">
   <div class="contact__glow" aria-hidden="true"></div>
@@ -29,7 +28,7 @@ const EMAIL = 'rpayerodev@gmail.com';
     </div>
     <ul class="contact__links reveal">
       <li><a href={`mailto:${EMAIL}`}>{EMAIL}</a></li>
-      <li><a href="https://www.linkedin.com/in/renzopayero/" rel="noopener" target="_blank">{c.linkedin}</a></li>
+      <li><a href={LINKEDIN} rel="noopener" target="_blank">{c.linkedin}</a></li>
       <li><a href="https://dakodev.com/" rel="noopener" target="_blank">{c.dakodev}</a></li>
     </ul>
   </div>
